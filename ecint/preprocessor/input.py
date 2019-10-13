@@ -1,35 +1,13 @@
-import json
 import os
+from abc import ABCMeta, abstractmethod
 from copy import deepcopy
 
-from aiida.orm import StructureData
 from aiida_cp2k.utils import Cp2kInput
-from ase.io import read
 
+from ecint.preprocessor import load_json
 from ecint.preprocessor.kind import *
-
-MODULE_DIR = os.path.dirname(os.path.abspath(__file__))
-
-
-def path2structure(structure_path):
-    """
-    :param structure_path:
-    :return: StructureData
-    """
-    atoms = read(structure_path)
-    structure = StructureData(ase=atoms)
-    return structure
-
-
-def load_json(json_path):
-    with open(json_path) as f:
-        d = json.load(f)
-    return d
-
-
-def inputfile2json(cp2k_input):
-    # TODO: need edit, parse cp2k input file to json format
-    pass
+from ecint.preprocessor.kind import BaseSets
+from ecint.workflow.units import CONFIG_DIR
 
 
 class BaseInput(metaclass=ABCMeta):
@@ -45,15 +23,22 @@ class BaseInput(metaclass=ABCMeta):
 
 class InputSetsFromFile(BaseInput):
 
-    def __init__(self, structure_path, config_path, kind_section_config_path):
+    def __init__(self, structure, config_path, kind_section_config='DZVPSets'):
         """
-        :param structure_path:
+        :param structure:
         :param config_path: base sets
-        :param kind_section_config_path: kind_section sets
+        :param kind_section_config: kind_section sets, use path or TZV2PSets or DZVPSets
         """
-        self.structure = path2structure(structure_path)
+        self.structure = structure
         self.config = load_json(config_path)
-        self.kind_section = SetsFromYaml(self.structure, kind_section_config_path).kind_section
+        # define self.kind_section
+        if os.path.exists(kind_section_config):
+            self.kind_section = SetsFromYaml(self.structure, kind_section_config).kind_section
+        elif issubclass(eval(kind_section_config), BaseSets):
+            __KindSectionSets = eval(kind_section_config)
+            self.kind_section = __KindSectionSets(self.structure).kind_section
+        else:
+            raise (ValueError, 'Unexpected kind_section_config, please input a yaml file or a builtin set')
 
     @property
     def input_sets(self):
@@ -81,23 +66,18 @@ class InputSetsFromFile(BaseInput):
 
 
 class InputSetsWithDefaultConfig(InputSetsFromFile):
-    def __init__(self, structure_path, config_path='', kind_section_config='DZVPSets'):
+
+    def __init__(self, structure, config, kind_section_config):
         """
-        :param structure_path
+        :param structure
+        :param config
         :param kind_section_config: kind_section_config_path or TZV2PSets or DZVPSets
         """
-        super(InputSetsWithDefaultConfig, self).__init__(structure_path, config_path, kind_section_config)
-        # define self.kind_section
-        if os.path.exists(kind_section_config):
-            self.kind_section = SetsFromYaml(self.structure, kind_section_config).kind_section
-        elif issubclass(eval(kind_section_config), BaseSets):
-            __KindSectionSets = eval(kind_section_config)
-            self.kind_section = __KindSectionSets(self.structure).kind_section
-        else:
-            raise (ValueError, 'Unexpected kind_section_config, please input a yaml file or a builtin set')
+        config_path = os.path.join(CONFIG_DIR, config)
+        super(InputSetsWithDefaultConfig, self).__init__(structure, config_path=config_path,
+                                                         kind_section_config=kind_section_config)
 
 
 class EnergyInputSets(InputSetsWithDefaultConfig):
-    def __init__(self, structure_path, config_path=os.path.join(MODULE_DIR, 'energy.json'),
-                 kind_section_config='DZVPSets'):
-        super(InputSetsWithDefaultConfig, self).__init__(structure_path, config_path, kind_section_config)
+    def __init__(self, structure_path, config='energy.json', kind_section_config='DZVPSets'):
+        super(EnergyInputSets, self).__init__(structure_path, config, kind_section_config)

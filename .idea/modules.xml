@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/../wdnmd/.idea/wdnmd.iml" filepath="$PROJECT_DIR$/../wdnmd/.idea/wdnmd.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../ecint/.idea/ecint.iml" filepath="$PROJECT_DIR$/../ecint/.idea/ecint.iml" />
     </modules>
   </component>
 </project>
