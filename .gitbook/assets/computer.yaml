@@ -1,0 +1,12 @@
+---
+label: "chenglab51"
+description: "chenglab's HPC 51"
+hostname: 121.192.191.51
+transport: ssh
+scheduler: lsf
+work_dir: "/data/{username}/aiida_run"
+mpirun_command: "mpiexec.hydra -np {tot_num_mpiprocs}"
+default_mpiprocs_per_machine: 24
+shebang: "#!/bin/bash"
+prepend_text: " "
+append_text: " "

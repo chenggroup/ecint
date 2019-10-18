@@ -1,0 +1,11 @@
+---
+label: "cp2k"
+description: "cp2k v4.1 in HPC 51"
+input_plugin: "cp2k"  
+computer: "chenglab51"
+on_computer: true
+remote_abs_path: "/share/apps/cp2k/4.1/bin/cp2k.popt"
+prepend_text: |
+    module load intel/17u5 mpi/intel/17u5
+    module load cp2k/4.1
+append_text: " "
