@@ -1,9 +1,0 @@
----
-username: ch1_102  # use your own username
-port: 6666
-look_for_keys: true
-key_filename: ~/.ssh/id_rsa
-allow_agent: true
-key_policy: AutoAddPolicy
-timeout: 59
-safe_interval: 5
