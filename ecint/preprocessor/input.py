@@ -79,5 +79,20 @@ class InputSetsWithDefaultConfig(InputSetsFromFile):
 
 
 class EnergyInputSets(InputSetsWithDefaultConfig):
-    def __init__(self, structure_path, config='energy.json', kind_section_config='DZVPSets'):
-        super(EnergyInputSets, self).__init__(structure_path, config, kind_section_config)
+    def __init__(self, structure, config='energy.json', kind_section_config='DZVPSets'):
+        super(EnergyInputSets, self).__init__(structure, config, kind_section_config)
+
+
+class GeooptInputSets(InputSetsWithDefaultConfig):
+    def __init__(self, structure_path, config='geoopt.json', kind_section_config='DZVPSets'):
+        super(GeooptInputSets, self).__init__(structure_path, config, kind_section_config)
+
+
+class NebInputSets(InputSetsWithDefaultConfig):
+    def __init__(self, structure_path, config='neb.json', kind_section_config='DZVPSets'):
+        super(NebInputSets, self).__init__(structure_path, config, kind_section_config)
+
+
+class FrequencyInputSets(InputSetsWithDefaultConfig):
+    def __init__(self, structure_path, config='frequency.json', kind_section_config='DZVPSets'):
+        super(FrequencyInputSets, self).__init__(structure_path, config, kind_section_config)

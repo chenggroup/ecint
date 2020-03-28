@@ -1,12 +1,40 @@
 {
   "GLOBAL": {
-    "RUN_TYPE": "GEO_OPT"
+    "RUN_TYPE": "BAND"
   },
   "MOTION": {
-    "GEO_OPT": {
-      "TYPE": "minimization",
-      "OPTIMIZER": "BFGS",
-      "MAX_ITER": 200
+    "BAND": {
+      "NPROC_REP": 28,
+      "BAND_TYPE": "CI-NEB",
+      "NUMBER_OF_REPLICA": 6,
+      "K_SPRING": 0.05,
+      "CONVERGENCE_CONTROL": {
+        "MAX_FORCE": 0.0030,
+        "rMS_FORCE": 0.0050,
+        "MAX_DR": 0.002,
+        "RMS_DR": 0.005
+      },
+      "ROTATE_FRAMES": "F",
+      "ALIGN_FRAMES": "F",
+      "CI_NEB": {
+        "NSTEPS_IT": 2
+      },
+      "OPTIMIZE_BAND": {
+        "OPT_TYPE": "DIIS",
+        "DIIS": {
+          "MAX_STEPS": 1000,
+          "N_DIIS": 3,
+          "NO_LS": null
+        }
+      },
+      "REPLICA": [
+        {
+          "COORD_FILE_NAME": "R.xyz"
+        },
+        {
+          "COORD_FILE_NAME": "P.xyz"
+        }
+      ]
     },
     "MD": {
       "THERMOSTAT": {
@@ -55,6 +83,10 @@
     "DFT": {
       "BASIS_SET_FILE_NAME": "BASIS_MOLOPT",
       "POTENTIAL_FILE_NAME": "GTH_POTENTIALS",
+      "MULTIPLICITY": 1,
+      "MGRID": {
+        "CUTOFF": 400
+      },
       "QS": {
         "EPS_DEFAULT": 1e-13,
         "EXTRAPOLATION": "ASPC",
@@ -85,54 +117,16 @@
               "REFERENCE_FUNCTIONAL": "PBE"
             }
           }
-        },
-        "PRINT": {
-          "E_DENSITY_CUBE": {
-            "ADD_LAST": "NUMERIC",
-            "EACH": {
-              "GEP_OPT": 0
-            }
-          },
-          "PDOS": {
-            "COMPONENTS": null,
-            "NLUMO": -1,
-            "ADD_LAST": "NUMERIC",
-            "EACH": {
-              "MD": 50,
-              "GEO_OPT": 0
-            },
-            "COMMON_ITERATION_LEVELS": 0,
-            "APPEND": "T"
-          },
-          "MO_CUBES": {
-            "NHOMO": 10,
-            "NLUMO": 10,
-            "WRITE_CUBE": "F",
-            "ADD_LAST": "NUMERIC",
-            "EACH": {
-              "MD": 50,
-              "GEO_OPT": 0
-            }
-          },
-          "V_HARTREE_CUBE": {
-            "_": "ON",
-            "APPEND": "T",
-            "EACH": {
-              "MD": 50,
-              "GEO_OPT": 0
-            },
-            "ADD_LAST": "NUMERIC"
-          }
         }
-      },
-      "PRINT": {
-        "STRESS_TENSOR": {
-          "_": null
-        }
-      },
-      "SUBSYS": {
-        "KIND": []
       }
+    },
+    "PRINT": {
+      "STRESS_TENSOR": {
+        "_": null
+      }
+    },
+    "SUBSYS": {
+      "KIND": []
     }
   }
 }

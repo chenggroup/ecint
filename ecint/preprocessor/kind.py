@@ -17,7 +17,7 @@ _E_WITH_Q = {'H': '1', 'He': '2', 'Li': '3', 'Be': '4', 'B': '3', 'C': '4', 'N':
 class BaseSets(metaclass=ABCMeta):
     def __init__(self, structure):
         self.structure = structure
-        self.elements = self.structure.get_symbols_set()
+        self.elements = set(self.structure.symbols)
 
     @property
     @abstractmethod

@@ -9,3 +9,12 @@ class EnergyWorkChain(Cp2kBaseWorkChain):
     @classmethod
     def define(cls, spec):
         super(EnergyWorkChain, cls).define(spec)
+
+class GeooptWorkChain(Cp2kBaseWorkChain):
+
+    @classmethod
+    def define(cls, spec):
+        super(EnergyWorkChain, cls).define(spec)
+
+    def results(cls):
+        pass
