@@ -1,0 +1,68 @@
+{
+  "GLOBAL": {
+    "RUN_TYPE": "ENERGY"
+  },
+  "FORCE_EVAL": {
+    "METHOD": "Quickstep",
+    "DFT": {
+      "BASIS_SET_FILE_NAME": "BASIS_MOLOPT",
+      "POTENTIAL_FILE_NAME": "GTH_POTENTIALS",
+      "QS": {
+        "EPS_DEFAULT": 1e-13,
+        "EXTRAPOLATION": "ASPC",
+        "EXTRAPOLATION_ORDER": 2
+      },
+      "SCF": {
+        "SCF_GUESS": "RESTART",
+        "EPS_SCF": 3e-7,
+        "MAX_SCF": 500,
+        "ADDED_MOS": 500,
+        "CHOLESKY": "INVERSE",
+        "SMEAR": {
+          "_": "ON",
+          "METHOD": "FERMI_DIRAC",
+          "ELECTRONIC_TEMPERATURE": 300
+        },
+        "DIAGONALIZATION": {
+          "ALGORITHM": "STANDARD"
+        },
+        "MIXING": {
+          "METHOD": "BROYDEN_MIXING",
+          "ALPHA": 0.3,
+          "BETA": 1.5,
+          "NBROYDEN": 14
+        },
+        "PRINT": {
+          "RESTART": {
+            "EACH": {
+              "QS_SCF": 50
+            },
+            "ADD_LAST": "NUMERIC"
+          }
+        }
+      },
+      "MGRID": {
+        "CUTOFF": 400
+      },
+      "XC": {
+        "XC_FUNCTIONAL": {
+          "_": "PBE"
+        },
+        "VDW_POTENTIAL": {
+          "DISPERSION_FUNCTIONAL": "PAIR_POTENTIAL",
+          "PAIR_POTENTIAL": {
+            "TYPE": "DFTD3",
+            "PARAMETER_FILE_NAME": "dftd3.dat",
+            "REFERENCE_FUNCTIONAL": "PBE",
+            "CALCULATE_C9_TERM": ".TRUE.",
+            "REFERENCE_C9_TERM": ".TRUE.",
+            "R_CUTOFF": 12
+          }
+        }
+      }
+    },
+    "SUBSYS": {
+      "KIND": []
+    }
+  }
+}
