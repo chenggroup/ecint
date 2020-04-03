@@ -1,5 +1,5 @@
 from aiida.orm import Str
-from aiida.engine import run_get_node
+from aiida.engine import run_get_node, submit
 from energy import EnergyWorkChain
 from aiida import load_profile
 load_profile()
@@ -10,8 +10,11 @@ input_files = {'structure_file': Str('h2o.xyz'),
 
 # submit workflow
 # builder = EnergyWorkChain.get_builder()
-submit_dict, submit_node = run_get_node(EnergyWorkChain, **input_files)
-# node = submit(EnergyWorkChain, **input_files)
+submit_dict, submit_node = run_get_node(EnergyWorkChain, **input_files)  # TODO: add entry to aiida
+# submit(EnergyWorkChain, **input_files)
+print('END')
+# print(submit_dict)
+# print(submit_node)
 # get_result
 """
 拿结果的类不宜放在 workchain 里（没法创建 workchain class 的实例），也许可以有另外的类包括工作流提交，拿结果之类的步骤

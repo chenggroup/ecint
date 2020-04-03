@@ -1,5 +1,4 @@
-from aiida import load_profile
-from aiida.engine import WorkChain, ToContext, submit, run_get_node
+from aiida.engine import WorkChain, ToContext, ExitCode, if_
 from aiida.orm import Str
 from ase.io import read
 
@@ -18,7 +17,9 @@ class EnergyWorkChain(WorkChain):
 
         spec.outline(
             cls.submit_workchain,
-            cls.inspect_workchain,
+            if_(cls.inspect_workchain)(
+                cls.get_result,
+            )
         )
 
     def submit_workchain(self):
@@ -33,3 +34,11 @@ class EnergyWorkChain(WorkChain):
 
     def inspect_workchain(self):
         return self.ctx.workchain.is_finished_ok
+
+    def get_result(self):
+        node = self.ctx.workchain
+        results = node.outputs.output_parameters.get_dict()
+        value, units = results['energy'], results['energy_units']
+        with open('results.txt', 'w') as f:
+            f.writelines([f'pk: {node.pk}\n', f'energy: {value} {units}'])
+        return ExitCode(0, 'Generate results.txt')
