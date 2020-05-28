@@ -1,6 +1,6 @@
 import os
-from aiida.engine import run
-from energy import EnergyWorkChain
+from test_t import NebWorkChain
+from aiida.engine import run_get_node, submit
 from aiida import load_profile
 load_profile()
 
@@ -11,11 +11,10 @@ if not os.path.exists(results_dir):
 os.chdir(results_dir)
 print(f'Now in {os.getcwd()}')
 
-input_files = {'structure_file': '../h2o.xyz',
+input_files = {'structure_list': ['../is.xyz', '../Replica3.xyz', '../fs.xyz'],
                'kind_section_file': '../kind_section.yaml',
                'machine_file': '../machine.json'}
-print('SUBMITTING...')
-run(EnergyWorkChain, input_files=input_files)  # TODO: add entry to aiida
+
+submit_dict, submit_node = run_get_node(NebWorkChain, input_files=input_files)
+# add dingtalk notification
 print('END')
-# 记得把包加入 PYTHONPATH 环境变量里
-# 后台运行的话用 nohup python run.py &

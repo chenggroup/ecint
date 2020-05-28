@@ -1,8 +1,10 @@
 from abc import ABCMeta, abstractmethod
-from ecint.preprocessor.utils import *
-from aiida.plugins import WorkflowFactory
+
 from aiida.orm import Dict, Code, StructureData
-from ecint.preprocessor.utils import load_json
+# from aiida.plugins import WorkflowFactory
+from aiida_cp2k.workchains import Cp2kBaseWorkChain
+
+from ecint.preprocessor.utils import load_machine, get_procs_per_node_from_code_name, check_neb
 
 
 class Preprocessor(metaclass=ABCMeta):
@@ -16,8 +18,8 @@ class Preprocessor(metaclass=ABCMeta):
         self.parameters = Dict(dict=inputclass.input_sets)
         self.machine = machine
 
-    def load_machine_from_json(self, machine_file_path):
-        self.machine = load_json(machine_file_path)
+    def load_machine_from_json(self, json_path):
+        self.machine = load_machine(json_path)
 
     @property
     @abstractmethod
@@ -28,21 +30,14 @@ class Preprocessor(metaclass=ABCMeta):
 class LSFPreprocessor(Preprocessor):
     @property
     def builder(self):
-        code = self.machine['code@computer']
-        tot_num_mpiprocs = self.machine['n']
-        max_wallclock_seconds = self.machine['W']
-        queue_name = self.machine['q']
-        custom_scheduler_commands = self.machine['R']
-
-        Cp2kBaseWorkChain = WorkflowFactory('cp2k.base')
         builder = Cp2kBaseWorkChain.get_builder()
         builder.cp2k.structure = self.structure
         builder.cp2k.parameters = self.parameters
-        builder.cp2k.code = Code.get_from_string(code)
-        builder.cp2k.metadata.options.resources = {'tot_num_mpiprocs': tot_num_mpiprocs}
-        builder.cp2k.metadata.options.max_wallclock_seconds = max_wallclock_seconds
-        builder.cp2k.metadata.options.queue_name = queue_name
-        builder.cp2k.metadata.options.custom_scheduler_commands = f'#BSUB -R \"{custom_scheduler_commands}\"'
+        builder.cp2k.code = Code.get_from_string(self.machine['code@computer'])
+        builder.cp2k.metadata.options.resources = {'tot_num_mpiprocs': self.machine['tot_num_mpiprocs']}
+        builder.cp2k.metadata.options.max_wallclock_seconds = self.machine['max_wallclock_seconds']
+        builder.cp2k.metadata.options.queue_name = self.machine['queue_name']
+        builder.cp2k.metadata.options.custom_scheduler_commands = self.machine['custom_scheduler_commands']
         return builder
 
 
@@ -66,6 +61,7 @@ class NebPreprocessor(LSFPreprocessor):
     def builder(self):
         builder = super(NebPreprocessor, self).builder
         builder.cp2k.settings = Dict(dict={'additional_retrieve_list': ["*-pos-Replica_nr_?-1.xyz"]})
+        check_neb(self.parameters.attributes, self.machine)
         return builder
 
 

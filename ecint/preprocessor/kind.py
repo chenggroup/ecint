@@ -2,7 +2,6 @@ from abc import ABCMeta, abstractmethod
 
 import yaml
 
-__all__ = ['SetsFromYaml', 'DZVPSets']
 
 _E_WITH_Q = {'H': '1', 'He': '2', 'Li': '3', 'Be': '4', 'B': '3', 'C': '4', 'N': '5', 'O': '6', 'F': '7', 'Ne': '8',
              'Na': '9', 'Mg': '2', 'Al': '3', 'Si': '4', 'P': '5', 'S': '6', 'Cl': '7', 'Ar': '8', 'K': '9', 'Ca': '10',
@@ -53,7 +52,7 @@ class SetsFromYaml(BaseSets):
         return kind_section_config
 
 
-class TZV2PSets(BaseSets):
+class TZV2PBLYP(BaseSets):
     @property
     def kind_section(self):
         kind_section_list = []
@@ -64,7 +63,18 @@ class TZV2PSets(BaseSets):
         return kind_section_list
 
 
-class DZVPSets(BaseSets):
+class DZVPBLYP(BaseSets):
+    @property
+    def kind_section(self):
+        kind_section_list = []
+        for e in self.elements:
+            one_kind_section = {'_': e, 'BASIS_SET': 'DZVP-MOLOPT-SR-GTH',
+                                'POTENTIAL': 'GTH-BLYP-q{}'.format(_E_WITH_Q[e])}
+            kind_section_list.append(one_kind_section)
+        return kind_section_list
+
+
+class DZVPPBE(BaseSets):
     @property
     def kind_section(self):
         kind_section_list = []

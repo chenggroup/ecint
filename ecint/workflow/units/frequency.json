@@ -1,6 +1,7 @@
 {
   "GLOBAL": {
-    "RUN_TYPE": "VIBRATIONAL_ANALYSIS"
+    "RUN_TYPE": "VIBRATIONAL_ANALYSIS",
+    "PRINT_LEVEL": "MEDIUM"
   },
   "FORCE_EVAL": {
     "METHOD": "Quickstep",
@@ -18,28 +19,28 @@
       },
       "SCF": {
         "SCF_GUESS": "RESTART",
-        "EPS_SCF": 3e-7,
+        "EPS_SCF": 1e-7,
         "MAX_SCF": 50,
         "OUTER_SCF": {
-          "EPS_SCF": 3e-7,
+          "EPS_SCF": 1e-7,
           "MAX_SCF": 10
         },
         "OT": {
           "MINIMIZER": "DIIS",
           "PRECONDITIONER": "FULL_SINGLE_INVERSE",
           "ENERGY_GAP": 0.1
+        }
+      },
+      "XC": {
+        "XC_FUNCTIONAL": {
+          "_": "PBE"
         },
-        "XC": {
-          "XC_FUNCTIONAL": {
-            "_": "PBE"
-          },
-          "VDW_POTENTIAL": {
-            "DISPERSION_FUNCTIONAL": "PAIR_POTENTIAL",
-            "PAIR_POTENTIAL": {
-              "TYPE": "DFTD3",
-              "PARAMETER_FILE_NAME": "dftd3.dat",
-              "REFERENCE_FUNCTIONAL": "PBE"
-            }
+        "VDW_POTENTIAL": {
+          "DISPERSION_FUNCTIONAL": "PAIR_POTENTIAL",
+          "PAIR_POTENTIAL": {
+            "TYPE": "DFTD3",
+            "PARAMETER_FILE_NAME": "dftd3.dat",
+            "REFERENCE_FUNCTIONAL": "PBE"
           }
         }
       }
@@ -51,13 +52,13 @@
   "VIBRATIONAL_ANALYSIS": {
     "NPROC_REP": 28,
     "DX": 0.01,
-    "FULLY_PERIODIC": null,
+    "FULLY_PERIODIC": "",
     "PRINT": {
       "MOLDEN_VIB": {
-        "_": null
+        "_": ""
       },
       "CARTESIAN_EIGS": {
-        "_": null
+        "_": ""
       },
       "PROGRAM_RUN_INFO": {
         "EACH": {

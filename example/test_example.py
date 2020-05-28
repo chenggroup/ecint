@@ -16,7 +16,7 @@ your_code = 'cp2k@chenglab51'
 
 
 class ExampleInputSets(InputSetsFromFile):
-    def __init__(self, structure, config=your_json, kind_section_config='DZVPSets'):
+    def __init__(self, structure, config=your_json, kind_section_config='DZVPBLYP'):
         super(ExampleInputSets, self).__init__(structure, config, kind_section_config)
 
 

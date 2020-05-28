@@ -26,7 +26,7 @@ load_profile()
 
 
 class NebInputSets(InputSetsFromFile):
-    def __init__(self, structure, config='neb.json', kind_section_config='DZVPSets'):
+    def __init__(self, structure, config='neb.json', kind_section_config='DZVPBLYP'):
         super(NebInputSets, self).__init__(structure, config, kind_section_config)
 
 
