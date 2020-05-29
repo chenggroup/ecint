@@ -1,4 +1,5 @@
 import numpy as np
+from ase import Atoms
 from ase.io import read, write
 
 PROJECT_NAME = 'aiida'
@@ -23,15 +24,18 @@ def get_series_file_name():
     pass
 
 
-def get_traj_for_energy_curve(replica_list, write_name=REPLICA_NAME):
-    # TODO: make replica_list as atoms list(traj)
+def get_traj_for_energy_curve(replica_traj_list, write_name=REPLICA_NAME):
     """
+    :param replica_traj_list: atoms list (traj list) or file/filelike list
+    :param write_name:
     do not write output file, set write_name=None or ''
     """
-    traj_for_energy_curve = []
-    for replica_traj in replica_list:
-        last_frame = get_last_frame(replica_traj)
-        traj_for_energy_curve.append(last_frame)
+    if isinstance(replica_traj_list[0], str):
+        traj_for_energy_curve = [get_last_frame(replica_traj_file) for replica_traj_file in replica_traj_list]
+    elif isinstance(replica_traj_list[0], Atoms):
+        traj_for_energy_curve = [replica_traj[-1] for replica_traj in replica_traj_list]
+    else:
+        raise ValueError('`replica_traj_list` need be list of atoms or file/filelike')
     if write_name:
         write(write_name, traj_for_energy_curve)
     return traj_for_energy_curve
@@ -46,3 +50,13 @@ def get_max_energy_frame(traj_file=REPLICA_NAME, write_name=MAX_ENERGY_NAME, cel
     if write_name:
         atoms_max_energy.write(write_name)
     return atoms_max_energy
+
+
+def get_convergence_info_of_band(node):
+    """
+    check if BAND.out is convergent
+    :param node:
+    :return:
+    """
+    # get remote_path
+

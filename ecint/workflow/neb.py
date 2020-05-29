@@ -1,10 +1,9 @@
 from os.path import abspath, join
-from warnings import warn
 import re
 
 from aiida.engine import WorkChain, append_
 from aiida.orm import SinglefileData
-from ase.io import read, write
+from ase.io import read
 
 from ecint.workflow.units import CONFIG_DIR
 from ecint.postprocessor import get_last_frame, get_traj_for_energy_curve, get_max_energy_frame
@@ -23,12 +22,14 @@ class NebWorkChain(WorkChain):
         spec.input('input_files.machine_file', valid_type=str, default='AutoMode', required=False, non_db=True)
         spec.input('input_files.geoopt_config_file', valid_type=str, default=join(CONFIG_DIR, 'geoopt.json'),
                    required=False, non_db=True)
-        spec.input('input_files.neb_config_file', valid_type=str, default=join(CONFIG_DIR, 'neb.json'), required=False,
-                   non_db=True)
+        spec.input('input_files.neb_config_file', valid_type=str, default=join(CONFIG_DIR, 'neb.json'),
+                   required=False, non_db=True)
         spec.input('input_files.frequency_config_file', valid_type=str, default=join(CONFIG_DIR, 'frequency.json'),
                    required=False, non_db=True)
         spec.input('input_files.kind_section_file', valid_type=str, default='DZVPBLYP', required=False, non_db=True)
 
+        # TODO: set/change name of Cp2kBaseWorkChain(in verdi process list) to Geoopt, Neb, Freq
+        #       maybe change the `process_label` (use node.set_process_label())
         spec.outline(
             cls.check_config,
             cls.prepare_atoms,
@@ -47,7 +48,7 @@ class NebWorkChain(WorkChain):
         # nproc_rep = self.ctx.neb_config['MOTION']['BAND'].get('NPROC_REP')
         number_of_replica = self.ctx.neb_config['MOTION']['BAND']['NUMBER_OF_REPLICA']
         if self.inputs.input_files.machine_file == 'AutoMode':
-            _default_machine = {'code@computer': 'cp2k@chenglab51', 'nnode': number_of_replica, 'queue': 'large'}
+            _default_machine = {'code@computer': 'cp2k@aiida_test', 'nnode': number_of_replica, 'queue': 'large'}
             self.ctx.machine = load_machine(_default_machine)
         else:
             self.ctx.machine = load_machine(self.inputs.input_files.machine_file)
@@ -91,7 +92,7 @@ class NebWorkChain(WorkChain):
         for replica_index, atoms in enumerate(atoms_list):
             replica_name = f'image_{replica_index}.xyz'
             atoms.write(replica_name)
-            replica_dict.update({f'image_{replica_index}': SinglefileData(file=replica_name)})
+            replica_dict.update({f'image_{replica_index}': SinglefileData(file=abspath(replica_name))})
             inputclass.add_config({'MOTION': {'BAND': {'REPLICA': [{'COORD_FILE_NAME': replica_name}]}}})
 
         pre = NebPreprocessor(inputclass, self.ctx.machine)
@@ -101,7 +102,8 @@ class NebWorkChain(WorkChain):
         self.to_context(neb_workchain=node)
 
     def inspect_neb(self):
-        # TODO: check convergence in BAND.out
+        # TODO: check convergence in BAND.out,
+        #       test a job which walltime is reached
         node = self.ctx.neb_workchain
         assert node.is_finished_ok
         # return node.is_finished_ok
@@ -109,13 +111,14 @@ class NebWorkChain(WorkChain):
     def get_energy_curve_data(self):
         self.ctx.energy_curve_file_name = 'Replica_data_for_energy_curve.xyz'
         node = self.ctx.neb_workchain
-        # TODO: use re.search to match replica filename
-        replica_last_frame_list = []
-        for i in range(1, 7):
+        # get list of atoms
+        replica_traj_list = []
+        number_of_replica = self.ctx.neb_config['MOTION']['BAND']['NUMBER_OF_REPLICA']
+        for i in range(1, number_of_replica+1):
+            # warning: if project name is not 'aiida', this part will fail
             with node.outputs.retrieved.open(f'aiida-pos-Replica_nr_{i}-1.xyz') as replica_file:
-                replica_last_frame = get_last_frame(replica_file, format='xyz')
-                replica_last_frame_list.append(replica_last_frame)
-        write(self.ctx.energy_curve_file_name, replica_last_frame_list)
+                replica_traj_list.append(read(replica_file))
+        get_traj_for_energy_curve(replica_traj_list, write_name=self.ctx.energy_curve_file_name)
 
     def submit_frequency(self):
         self.ctx.transition_state_file_name = 'Transition_State.xyz'

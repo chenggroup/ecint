@@ -33,11 +33,14 @@ class LSFPreprocessor(Preprocessor):
         builder = Cp2kBaseWorkChain.get_builder()
         builder.cp2k.structure = self.structure
         builder.cp2k.parameters = self.parameters
-        builder.cp2k.code = Code.get_from_string(self.machine['code@computer'])
-        builder.cp2k.metadata.options.resources = {'tot_num_mpiprocs': self.machine['tot_num_mpiprocs']}
-        builder.cp2k.metadata.options.max_wallclock_seconds = self.machine['max_wallclock_seconds']
-        builder.cp2k.metadata.options.queue_name = self.machine['queue_name']
-        builder.cp2k.metadata.options.custom_scheduler_commands = self.machine['custom_scheduler_commands']
+        builder.cp2k.code = Code.get_from_string(self.machine.get('code@computer'))
+        builder.cp2k.metadata.options.resources = {'tot_num_mpiprocs': self.machine.get('tot_num_mpiprocs')}
+        if self.machine.get('max_wallclock_seconds'):
+            builder.cp2k.metadata.options.max_wallclock_seconds = self.machine.get('max_wallclock_seconds')
+        if self.machine.get('queue_name'):
+            builder.cp2k.metadata.options.queue_name = self.machine.get('queue_name')
+        if self.machine.get('custom_scheduler_commands'):
+            builder.cp2k.metadata.options.custom_scheduler_commands = self.machine.get('custom_scheduler_commands')
         return builder
 
 

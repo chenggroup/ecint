@@ -5,13 +5,13 @@ import requests
 import json
 
 
-def path2structure(structure_path, cell, pbc=True):
+def path2atoms(structure_path, cell, pbc=True):
     """
     :param structure_path:
     :param cell: (list) cell parameters, can be set as [(1,0,0), (0,1,0), (0,0,1)] or like [1, 1, 1, 90, 90, 90],
                  units: angstrom, angle
     :param pbc: periodic boundary conditions, can be set as [False, False, True]
-    :return: StructureData
+    :return: atoms
     """
     atoms = read(structure_path)
     atoms.set_cell(cell)
@@ -74,10 +74,12 @@ def get_procs_per_node_from_code_name(code_computer):
     :return: node_core_num: int
     """
     code, computer = code_computer.split('@')
-    # TODO: Need add more computer's procs_per_node, change it with to builtin config
+    # TODO: Need add more computer's procs_per_node, change it to builtin config
     if computer == 'chenglab51':
         procs_per_node = 24
     elif computer == 'chenglab52':
+        procs_per_node = 28
+    elif computer == 'aiida_test':
         procs_per_node = 28
     else:
         procs_per_node = get_procs_per_node(computer)
@@ -164,15 +166,16 @@ def check_neb(parameters, restrict_machine):
 
 
 # def check_neb(parameters, machine):
-    # warning: if 'NPROC_REP' not set, than it will be setted as tot_num_mpiprocs / number_of_replica
+# warning: if 'NPROC_REP' not set, than it will be setted as tot_num_mpiprocs / number_of_replica
 
-    # set default nnode/tot_num_mpiprocs
-    # number_of_replica = parameters['MOTION']['BAND']['NUMBER_OF_REPLICA']
-    # tot_num_mpiprocs = machine['tot_num_mpiprocs']
-    # auto generate nproc_rep
-    # nproc_rep = parameters['MOTION']['BAND'].setdefault('NPROC_REP', tot_num_mpiprocs / number_of_replica)
-    # if isinstance(nproc_rep, int):
-    #     raise ValueError(f'Number of process should be int')
+# set default nnode/tot_num_mpiprocs
+# number_of_replica = parameters['MOTION']['BAND']['NUMBER_OF_REPLICA']
+# tot_num_mpiprocs = machine['tot_num_mpiprocs']
+# auto generate nproc_rep
+# nproc_rep = parameters['MOTION']['BAND'].setdefault('NPROC_REP', tot_num_mpiprocs / number_of_replica)
+# if isinstance(nproc_rep, int):
+#     raise ValueError(f'Number of process should be int')
+
 
 def notification_in_dingtalk(webhook, node):
     headers = {'Content-Type': 'application/json'}
@@ -182,8 +185,12 @@ def notification_in_dingtalk(webhook, node):
     text += '>\n'
     text += f'> Job PK: **{node.pk}**\n'
     text += '>\n'
-    text += f'> Job Chemical Formula: **{node.inputs.structure.get_formula()}**\n'
-    text += '>\n'
+    try:
+        node.called[0].inputs.cp2k__structure.get_formula()
+        text += f'> Job Chemical Formula: **{node.called[0].inputs.cp2k__structure.get_formula()}**\n'
+        text += '>\n'
+    except AttributeError:
+        pass
     text += f'> Job Type: **{node.process_label}**\n'
     text += '>\n'
     text += f'> Job State: **{node.process_state.name}**\n'
