@@ -189,7 +189,7 @@ def notification_in_dingtalk(webhook, node):
         node.called[0].inputs.cp2k__structure.get_formula()
         text += f'> Job Chemical Formula: **{node.called[0].inputs.cp2k__structure.get_formula()}**\n'
         text += '>\n'
-    except AttributeError:
+    except AttributeError or IndexError:
         pass
     text += f'> Job Type: **{node.process_label}**\n'
     text += '>\n'
