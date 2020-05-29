@@ -1,4 +1,5 @@
-from os.path import abspath, join
+from os.path import abspath, join, isabs
+from os import chdir
 import re
 
 from aiida.engine import WorkChain, append_
@@ -18,6 +19,7 @@ class NebWorkChain(WorkChain):
         super(NebWorkChain, cls).define(spec)
         # TODO: use more parameters,
         #  use split kind_section, machine config for geoopt, neb, freq
+        spec.input('workdir', valid_type=str, non_db=True)
         spec.input('input_files.structure_list', valid_type=list, non_db=True)  # TODO: make structure_list[atoms, ...]
         spec.input('input_files.machine_file', valid_type=str, default='AutoMode', required=False, non_db=True)
         spec.input('input_files.geoopt_config_file', valid_type=str, default=join(CONFIG_DIR, 'geoopt.json'),
@@ -31,6 +33,7 @@ class NebWorkChain(WorkChain):
         # TODO: set/change name of Cp2kBaseWorkChain(in verdi process list) to Geoopt, Neb, Freq
         #       maybe change the `process_label` (use node.set_process_label())
         spec.outline(
+            cls.goto_workdir,
             cls.check_config,
             cls.prepare_atoms,
             cls.submit_geoopt,
@@ -42,6 +45,13 @@ class NebWorkChain(WorkChain):
             cls.inspect_frequency,
             cls.get_frequency_data,
         )
+
+    def goto_workdir(self):
+        workdir = self.inputs.workdir
+        if isabs(workdir):
+            chdir(workdir)
+        else:
+            raise ValueError('`workdir` need be a absolute path')
 
     def check_config(self):
         self.ctx.neb_config = load_json(self.inputs.input_files.neb_config_file)
@@ -114,7 +124,7 @@ class NebWorkChain(WorkChain):
         # get list of atoms
         replica_traj_list = []
         number_of_replica = self.ctx.neb_config['MOTION']['BAND']['NUMBER_OF_REPLICA']
-        for i in range(1, number_of_replica+1):
+        for i in range(1, number_of_replica + 1):
             # warning: if project name is not 'aiida', this part will fail
             with node.outputs.retrieved.open(f'aiida-pos-Replica_nr_{i}-1.xyz') as replica_file:
                 replica_traj_list.append(read(replica_file))
