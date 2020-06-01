@@ -127,7 +127,7 @@ class NebWorkChain(WorkChain):
         for i in range(1, number_of_replica + 1):
             # warning: if project name is not 'aiida', this part will fail
             with node.outputs.retrieved.open(f'aiida-pos-Replica_nr_{i}-1.xyz') as replica_file:
-                replica_traj_list.append(read(replica_file))
+                replica_traj_list.append(read(replica_file, format='xyz'))
         get_traj_for_energy_curve(replica_traj_list, write_name=self.ctx.energy_curve_file_name)
 
     def submit_frequency(self):
