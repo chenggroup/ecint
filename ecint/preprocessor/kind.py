@@ -1,5 +1,6 @@
 from abc import ABCMeta, abstractmethod
-
+from ase import Atoms
+from aiida.orm import StructureData
 import yaml
 
 
@@ -15,8 +16,16 @@ _E_WITH_Q = {'H': '1', 'He': '2', 'Li': '3', 'Be': '4', 'B': '3', 'C': '4', 'N':
 
 class BaseSets(metaclass=ABCMeta):
     def __init__(self, structure):
+        """
+        :param structure: Atoms or StructureData
+        """
+        if isinstance(structure, StructureData):
+            self.elements = structure.get_symbols_set()
+        elif isinstance(structure, Atoms):
+            self.elements = set(structure.symbols)
+        else:
+            raise TypeError('structure need be StructureData or ase Atoms')
         self.structure = structure
-        self.elements = set(self.structure.symbols)
 
     @property
     @abstractmethod

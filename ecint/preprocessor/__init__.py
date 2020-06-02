@@ -1,5 +1,5 @@
 from abc import ABCMeta, abstractmethod
-
+from ase import Atoms
 from aiida.orm import Dict, Code, StructureData
 # from aiida.plugins import WorkflowFactory
 from aiida_cp2k.workchains import Cp2kBaseWorkChain
@@ -14,7 +14,7 @@ class Preprocessor(metaclass=ABCMeta):
     """
 
     def __init__(self, inputclass, machine=None):
-        self.structure = StructureData(ase=inputclass.structure)
+        self.structure = inputclass.structure
         self.parameters = Dict(dict=inputclass.input_sets)
         self.machine = machine
 
@@ -31,7 +31,10 @@ class LSFPreprocessor(Preprocessor):
     @property
     def builder(self):
         builder = Cp2kBaseWorkChain.get_builder()
-        builder.cp2k.structure = self.structure
+        if isinstance(self.structure, StructureData):
+            builder.cp2k.structure = self.structure
+        elif isinstance(self.structure, Atoms):
+            builder.cp2k.structure = StructureData(ase=self.structure)
         builder.cp2k.parameters = self.parameters
         builder.cp2k.code = Code.get_from_string(self.machine.get('code@computer'))
         builder.cp2k.metadata.options.resources = {'tot_num_mpiprocs': self.machine.get('tot_num_mpiprocs')}

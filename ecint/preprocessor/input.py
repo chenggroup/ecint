@@ -26,7 +26,7 @@ class InputSetsFromFile(BaseInput):
 
     def __init__(self, structure, config_path, kind_section_config='DZVPBLYP'):
         """
-        :param structure: atoms
+        :param structure: atoms or StructureData
         :param config_path: base sets
         :param kind_section_config: kind_section sets, use path or TZV2PBLYP or DZVPBLYP DZVPPBE
         """
@@ -64,6 +64,7 @@ class InputSetsFromFile(BaseInput):
         from aiida_cp2k.calculations import Cp2kCalculation
         inp = Cp2kInput(self.input_sets)
         for i, letter in enumerate('ABC'):
+            # atoms or StructureData has the same property `cell`
             inp.add_keyword('FORCE_EVAL/SUBSYS/CELL/' + letter, '{:<15} {:<15} {:<15}'.format(*self.structure.cell[i]),
                             override=False, conflicting_keys=['ABC', 'ALPHA_BETA_GAMMA', 'CELL_FILE_NAME'])
             topo = "FORCE_EVAL/SUBSYS/TOPOLOGY"
