@@ -66,12 +66,15 @@ class NebWorkChain(WorkChain):
 
     def prepare_atoms(self):
         # TODO: make pbc can change config.json
+        # TODO: add constrains
         atoms = read(self.inputs.input_files.structure_list[0])
         self.ctx.cell = atoms.cell
         self.ctx.pbc = atoms.pbc
 
     def submit_geoopt(self):
-        for structure_file in self.inputs.input_files.structure_list:
+        reactant_structure_file = self.inputs.input_files.structure_list[0]
+        product_structure_file = self.inputs.input_files.structure_list[-1]
+        for i, structure_file in enumerate([reactant_structure_file, product_structure_file]):
             atoms = read(structure_file)
             atoms.set_cell(self.ctx.cell)
             atoms.set_pbc(self.ctx.pbc)
@@ -80,12 +83,15 @@ class NebWorkChain(WorkChain):
             pre = GeooptPreprocessor(inputclass, self.ctx.machine)
             builder = pre.builder
             node = self.submit(builder)
-            self.to_context(geoopt_workchain=append_(node))
+            if i == 0:
+                self.to_context(geoopt_for_reactant_workchain=node)
+            elif i == 1:
+                self.to_context(geoopt_for_product_workchain=node)
 
     def inspect_geoopt(self):
         # TODO: use return exitcode instead of assert
         # geoopt_is_finished_ok = []
-        for node in self.ctx.geoopt_workchain:
+        for node in [self.ctx.geoopt_for_reactant_workchain, self.ctx.geoopt_for_product_workchain]:
             assert node.is_finished_ok
         # return all(geoopt_is_finished_ok)
 
