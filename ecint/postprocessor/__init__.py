@@ -33,7 +33,7 @@ def get_traj_for_energy_curve(replica_traj_list, write_name=REPLICA_NAME):
     if isinstance(replica_traj_list[0], str):
         traj_for_energy_curve = [get_last_frame(replica_traj_file) for replica_traj_file in replica_traj_list]
     elif isinstance(replica_traj_list[0], Atoms):
-        traj_for_energy_curve = [replica_traj[-1] for replica_traj in replica_traj_list]
+        traj_for_energy_curve = [replica_traj for replica_traj in replica_traj_list]
     else:
         raise ValueError('`replica_traj_list` need be list of atoms or file/filelike')
     if write_name:

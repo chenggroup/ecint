@@ -13,7 +13,7 @@
   "install_requires": [
     "aiida-core==1.0.1",
     "aiida-cp2k==1.0.0b6",
-    "ase",
+    "ase==3.19.0",
     "flask",
     "flask_cors",
     "flask_restful"
