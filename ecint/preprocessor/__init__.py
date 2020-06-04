@@ -18,8 +18,8 @@ class Preprocessor(metaclass=ABCMeta):
         self.parameters = Dict(dict=inputclass.input_sets)
         self.machine = machine
 
-    def load_machine_from_json(self, json_path):
-        self.machine = load_machine(json_path)
+    def load_machine_from_json(self, machine_file):
+        self.machine = load_machine(machine_file)
 
     @property
     @abstractmethod

@@ -1,8 +1,7 @@
 from abc import ABCMeta, abstractmethod
 from ase import Atoms
 from aiida.orm import StructureData
-import yaml
-
+from ecint.preprocessor.utils import load_yaml
 
 _E_WITH_Q = {'H': '1', 'He': '2', 'Li': '3', 'Be': '4', 'B': '3', 'C': '4', 'N': '5', 'O': '6', 'F': '7', 'Ne': '8',
              'Na': '9', 'Mg': '2', 'Al': '3', 'Si': '4', 'P': '5', 'S': '6', 'Cl': '7', 'Ar': '8', 'K': '9', 'Ca': '10',
@@ -54,8 +53,7 @@ class SetsFromYaml(BaseSets):
     @staticmethod
     def load_kind_section_config_file(kind_section_config_path):
         try:
-            with open(kind_section_config_path, 'r') as f:
-                kind_section_config = yaml.load(f)
+            kind_section_config = load_yaml(kind_section_config_path)
         except IOError:
             print('Can not find file {}'.format(kind_section_config_path))
         return kind_section_config

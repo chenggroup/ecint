@@ -1,8 +1,11 @@
+from copy import deepcopy
+import requests
+import json
+import yaml
+from yaml import SafeLoader
 from warnings import warn
 from ase.io import read
 from aiida.orm import Computer
-import requests
-import json
 
 
 def path2atoms(structure_path, cell, pbc=True):
@@ -28,6 +31,10 @@ def load_json(json_path):
         d = json.load(f)
     return d
 
+def load_yaml(yaml_path):
+    with open(yaml_path) as f:
+        d = yaml.load(f, Loader=SafeLoader)
+    return d
 
 def update_dict(nested_dict, item):
     """
@@ -86,17 +93,22 @@ def get_procs_per_node_from_code_name(code_computer):
     return procs_per_node
 
 
-def load_machine(machine_json):
+def load_machine(machine_config):
     """
-    :param machine_json: json_path or dict
+    :param machine_config: json file or yaml file or dict
     :return:
     """
-    if isinstance(machine_json, dict):
-        _machine = machine_json
-    elif isinstance(machine_json, str):
-        _machine = load_json(machine_json)
+    if isinstance(machine_config, dict):
+        _machine = machine_config
+    elif isinstance(machine_config, str):
+        if machine_config.endswith('.yaml') or machine_config.endswith('.yml'):
+            _machine = load_yaml(machine_config)
+        elif machine_config.endswith('.json'):
+            _machine = load_json(machine_config)
+        else:
+            raise ValueError('machine file should be .json or .yaml file')
     else:
-        raise ValueError('Please use correct format of `machine`, dict or your json file path')
+        raise ValueError('Please use correct format of `machine`, dict or your .json/.yaml file path')
     restrict_machine = {}
     # set `code@computer`
     if 'code@computer' not in _machine:
