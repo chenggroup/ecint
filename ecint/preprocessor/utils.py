@@ -31,10 +31,12 @@ def load_json(json_path):
         d = json.load(f)
     return d
 
+
 def load_yaml(yaml_path):
     with open(yaml_path) as f:
         d = yaml.load(f, Loader=SafeLoader)
     return d
+
 
 def update_dict(nested_dict, item):
     """
