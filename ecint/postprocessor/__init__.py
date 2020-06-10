@@ -60,3 +60,8 @@ def get_convergence_info_of_band(node):
     """
     # get remote_path
 
+
+def write_output_files():
+    # split write output files step from workchain
+    pass
+

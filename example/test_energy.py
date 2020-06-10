@@ -21,7 +21,7 @@ input_files = {'structure_file': Str('../test/energy/h2o.xyz'),
 atoms = read(input_files['structure_file'].value)
 inputclass = EnergyInputSets(atoms, config='energy.json', kind_section_config=input_files['kind_section_file'].value)
 pre = EnergyPreprocessor(inputclass)
-pre.load_machine_from_json(input_files['machine_file'].value)
+pre.load_machine(input_files['machine_file'].value)
 builder = pre.builder
 submit(builder)
 

@@ -32,6 +32,7 @@ class InputSetsFromFile(BaseInput):
         """
         self.structure = structure
         self.config = load_json(config_path)
+        # TODO: add check for atoms.cell or atoms.get_volume
         # define self.kind_section
         if os.path.exists(kind_section_config):
             self.kind_section = SetsFromYaml(self.structure, kind_section_config).kind_section

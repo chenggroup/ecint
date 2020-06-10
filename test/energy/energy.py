@@ -40,7 +40,7 @@ class EnergyWorkChain(WorkChain):
         inputclass = EnergyInputSets(atoms, config=self.inputs.input_files.config_file,  # use default energy config
                                      kind_section_config=self.inputs.input_files.kind_section_file)
         pre = EnergyPreprocessor(inputclass)
-        pre.load_machine_from_json(self.inputs.input_files.machine_file)
+        pre.load_machine_from_file(self.inputs.input_files.machine_file)
         builder = pre.builder
         node = self.submit(builder)
         return ToContext(workchain=node)

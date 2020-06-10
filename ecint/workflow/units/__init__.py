@@ -4,7 +4,6 @@ from aiida.orm import Dict, StructureData, Code
 from aiida.engine import run
 from ecint.preprocessor.utils import load_json, load_machine, check_neb
 
-
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
@@ -18,15 +17,15 @@ class JsonDryRun(object):
     def default_machine(self):
         machine = {
             'n': 144,
-            'W': 20*60,
+            'W': 20 * 60,
             'q': 'large',
             'ptile': 24,
             'code@computer': 'cp2k@chenglab51',
         }
         return load_machine(machine)
 
-    def load_machine_from_json(self, machine_file_path):
-        self.machine = load_json(machine_file_path)
+    def load_machine(self, machine_config):
+        self.machine = load_json(machine_config)
 
     @property
     def builder(self):

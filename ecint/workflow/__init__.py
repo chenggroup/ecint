@@ -1,1 +1,1 @@
-from ecint.workflow.neb import NebWorkChain
+from .neb import NebWorkChain

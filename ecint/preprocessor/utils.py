@@ -8,24 +8,6 @@ from ase.io import read
 from aiida.orm import Computer
 
 
-def path2atoms(structure_path, cell, pbc=True):
-    """
-    :param structure_path:
-    :param cell: (list) cell parameters, can be set as [(1,0,0), (0,1,0), (0,0,1)] or like [1, 1, 1, 90, 90, 90],
-                 units: angstrom, angle
-    :param pbc: periodic boundary conditions, can be set as [False, False, True]
-    :return: atoms
-    """
-    atoms = read(structure_path)
-    atoms.set_cell(cell)
-    if (atoms.cell == 0).all():
-        raise ValueError('The cell parameters can not be all zero.')
-    else:
-        atoms.set_pbc(pbc)
-        # structure = StructureData(ase=atoms)
-    return atoms
-
-
 def load_json(json_path):
     with open(json_path) as f:
         d = json.load(f)
@@ -121,22 +103,22 @@ def load_machine(machine_config):
     procs_per_node = get_procs_per_node_from_code_name(_machine['code@computer'])
     if 'nnode' in _machine:
         nprocs = _machine['nnode'] * procs_per_node
-        if 'nprocs' or 'n' in _machine:
+        if ('nprocs' in _machine) or ('n' in _machine):
             warn('You have set both `nnode` and `nprocs`(`n`), and the value of `nprocs`(`n`) will be ignored', Warning)
-    elif 'nprocs' or 'n' in _machine:
+    elif ('nprocs' in _machine) or ('n' in _machine):
         nprocs = _machine.get('nprocs') or _machine.get('n')
     else:
         raise KeyError('You must set `nnode` or `nprocs` to appoint computing resources')
     restrict_machine.update({'tot_num_mpiprocs': nprocs})
     # set `walltime`
-    if not ('walltime' or 'max_wallclock_seconds' or 'W' or 'w' in _machine):
+    if not (('walltime' in _machine) or ('max_wallclock_seconds' in _machine) or ('W' in _machine) or ('w' in _machine)):
         warn('You should set `walltime`, otherwise your job may waste computing resources', Warning)
     else:
         walltime = _machine.get('walltime') or _machine.get('max_wallclock_seconds') \
                    or _machine.get('W') or _machine.get('w')
         restrict_machine.update({'max_wallclock_seconds': walltime})
     # set `queue_name`
-    if not ('queue' or 'queue_name' or 'q' in _machine):
+    if not (('queue' in _machine) or ('queue_name' in _machine) or ('q' in _machine)):
         warn('You have not set `queue`, so default value will be used', Warning)
     else:
         queue = _machine.get('queue') or _machine.get('queue_name') or _machine.get('q')
@@ -158,9 +140,34 @@ def inp2json(cp2k_input):
     pass
 
 
-def check_neb(parameters, restrict_machine):
-    # warning: if 'NPROC_REP' not set, than it will be setted as procs_per_node
+def inspect_node(node):
+    """
+    inspect WorkChainNode is_finished_ok
+    :param node: WorkChainNode
+    :return:
+    """
+    # TODO: add some ExitCode
+    assert node.is_finished_ok
 
+
+def to_structure():
+    # TODO: Atoms or str to StructureData
+    pass
+
+
+def check_machine():
+    # TODO: check machine for a general situation
+    pass
+
+
+def check_neb(parameters, restrict_machine):
+    """
+    will update parameters['MOTION']['BAND']['NPROC_REP'] or restrict_machine['tot_num_mpiprocs']
+    :param parameters:
+    :param restrict_machine:
+    :return:
+    """
+    # warning: if 'NPROC_REP' not set, than it will be setted as procs_per_node
     # set default nproc_rep as procs_per_node
     procs_per_node = get_procs_per_node_from_code_name(restrict_machine['code@computer'])
     if parameters['MOTION']['BAND'].get('NPROC_REP'):

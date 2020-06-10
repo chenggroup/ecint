@@ -1,162 +1,163 @@
-from os.path import abspath, join, isabs
 from os import chdir
-import re
-
-from aiida.engine import WorkChain, append_
-from aiida.orm import SinglefileData
-from ase.io import read
-
+from os.path import join, abspath, isabs
+from numpy import savetxt
+from ase.io import read, write
+from aiida.orm import StructureData
+from aiida.engine import WorkChain, ExitCode, ToContext, if_
+from ecint.preprocessor import test_machine
+from ecint.preprocessor.utils import load_json, load_machine, check_neb, inspect_node
 from ecint.workflow.units import CONFIG_DIR
-from ecint.postprocessor import get_last_frame, get_traj_for_energy_curve, get_max_energy_frame
-from ecint.preprocessor import GeooptPreprocessor, NebPreprocessor, FrequencyPreprocessor
-from ecint.preprocessor.utils import load_json, load_machine, check_neb
-from ecint.preprocessor.input import GeooptInputSets, NebInputSets, FrequencyInputSets
+from ecint.workflow.units.base import GeooptSingleWorkChain, NebSingleWorkChain, FrequencySingleWorkChain
 
 
 class NebWorkChain(WorkChain):
     @classmethod
     def define(cls, spec):
         super(NebWorkChain, cls).define(spec)
-        # TODO: use more parameters,
-        #  use split kind_section, machine config for geoopt, neb, freq
-        spec.input('workdir', valid_type=str, non_db=True)
-        spec.input('input_files.structure_list', valid_type=list, non_db=True)  # TODO: make structure_list[atoms, ...]
-        spec.input('input_files.machine_file', valid_type=str, default='AutoMode', required=False, non_db=True)
-        spec.input('input_files.geoopt_config_file', valid_type=str, default=join(CONFIG_DIR, 'geoopt.json'),
-                   required=False, non_db=True)
-        spec.input('input_files.neb_config_file', valid_type=str, default=join(CONFIG_DIR, 'neb.json'),
-                   required=False, non_db=True)
-        spec.input('input_files.frequency_config_file', valid_type=str, default=join(CONFIG_DIR, 'frequency.json'),
-                   required=False, non_db=True)
-        spec.input('input_files.kind_section_file', valid_type=str, default='DZVPBLYP', required=False, non_db=True)
+        # use structures.image_0 as reactant, image_1 as next point in energy curve, and so on
+        # the last image_N as product
+        spec.input_namespace('structures', valid_type=StructureData, dynamic=True)
+        spec.input('workdir', valid_type=(str, type(None)), default=None, required=False, non_db=True)
 
-        # TODO: set/change name of Cp2kBaseWorkChain(in verdi process list) to Geoopt, Neb, Freq
-        #       maybe change the `process_label` (use node.set_process_label())
+        # set global input files, default is None
+        spec.input('kind_section_file', valid_type=(str, type(None)), default=None, required=False, non_db=True)
+        spec.input('machine_file', valid_type=(str, type(None)), default=None, required=False, non_db=True)
+
+        # set geoopt input files
+        spec.expose_inputs(GeooptSingleWorkChain, namespace='geoopt', exclude=['structure'])
+        # spec.input('geoopt.config_file', default=join(CONFIG_DIR, 'geoopt.json'),
+        #            valid_type=str, required=False, non_db=True)
+        # spec.input('geoopt.kind_section_file', valid_type=str, default='DZVPBLYP', required=False, non_db=True)
+        # spec.input('geoopt.machine_file', valid_type=str, default='AutoMode', required=False, non_db=True)
+
+        # set neb input files
+        spec.expose_inputs(NebSingleWorkChain, namespace='neb', exclude=['structures'])
+        # spec.input('neb.config_file', default=join(CONFIG_DIR, 'neb.json'),
+        #            valid_type=str, required=False, non_db=True)
+        # spec.input('neb.kind_section_file', valid_type=str, default='DZVPBLYP', required=False, non_db=True)
+        # spec.input('neb.machine_file', valid_type=str, default='AutoMode', required=False, non_db=True)
+
+        # set frequency input files
+        spec.expose_inputs(FrequencySingleWorkChain, namespace='frequency', exclude=['structure'])
+        # spec.input('frequency.config_file', default=join(CONFIG_DIR, 'frequency.json'),
+        #            valid_type=str, required=False, non_db=True)
+        # spec.input('frequency.kind_section_file', valid_type=str, default='DZVPBLYP', required=False, non_db=True)
+        # spec.input('frequency.machine_file', valid_type=str, default='AutoMode', required=False, non_db=True)
+
         spec.outline(
-            cls.goto_workdir,
-            cls.check_config,
-            cls.prepare_atoms,
+            cls.check_machine_and_config,
             cls.submit_geoopt,
             cls.inspect_geoopt,
             cls.submit_neb,
             cls.inspect_neb,
-            cls.get_energy_curve_data,
             cls.submit_frequency,
             cls.inspect_frequency,
-            cls.get_frequency_data,
+            if_(cls.inputs.workdir)(
+                cls.write_outputs,
+            ),
         )
 
-    def goto_workdir(self):
-        workdir = self.inputs.workdir
-        if isabs(workdir):
-            chdir(workdir)
-        else:
-            raise ValueError('`workdir` need be a absolute path')
+        spec.expose_outputs(GeooptSingleWorkChain, namespace='reactant')
+        spec.expose_outputs(GeooptSingleWorkChain, namespace='product')
+        spec.expose_outputs(NebSingleWorkChain)
+        spec.expose_outputs(FrequencySingleWorkChain)
 
-    def check_config(self):
-        self.ctx.neb_config = load_json(self.inputs.input_files.neb_config_file)
-        # nproc_rep = self.ctx.neb_config['MOTION']['BAND'].get('NPROC_REP')
-        number_of_replica = self.ctx.neb_config['MOTION']['BAND']['NUMBER_OF_REPLICA']
-        if self.inputs.input_files.machine_file == 'AutoMode':
-            _default_machine = {'code@computer': 'cp2k@aiida_test', 'nnode': number_of_replica, 'queue': 'large'}
-            self.ctx.machine = load_machine(_default_machine)
+    def check_machine_and_config(self):
+        if len(self.inputs.structures) < 2:
+            raise ValueError('The input structures should be at least two--reactant and product')
+        # use self.ctx.neb_config to replace
+        self.ctx.neb_config = load_json(self.inputs.neb.config_file)
+        self.ctx.number_of_replica = self.ctx.neb_config['MOTION']['BAND']['NUMBER_OF_REPLICA']
+        if self.ctx.number_of_replica < len(self.inputs.structures):
+            raise ValueError('Number of input structures should be greater than number of replicas'
+                             'which you set in /MOTION/BAND/NUMBER_OF_REPLICA')
+        if self.inputs.neb.machine_file == 'AutoMode':
+            auto_machine = {'code@computer': 'cp2k@aiida_test', 'nnode': self.ctx.number_of_replica, 'queue': 'large'}
+            self.ctx.neb_machine = load_machine(auto_machine)
+        elif self.inputs.neb.machine_file == 'TestMode':
+            self.ctx.neb_machine = load_machine(test_machine)
         else:
-            self.ctx.machine = load_machine(self.inputs.input_files.machine_file)
-        check_neb(self.ctx.neb_config, self.ctx.machine)
-
-    def prepare_atoms(self):
-        # TODO: make pbc can change config.json
-        # TODO: add constrains
-        atoms = read(self.inputs.input_files.structure_list[0])
-        self.ctx.cell = atoms.cell
-        self.ctx.pbc = atoms.pbc
+            self.ctx.neb_machine = load_machine(self.inputs.neb.machine_file)
+        self.ctx.machine = None
+        if self.inputs.machine_file:
+            self.ctx.machine = load_machine(self.inputs.machine_file)
+            self.report(f'Use {abspath(self.inputs.machine_file)} as machine config')
+        check_neb(self.ctx.neb_config, self.ctx.machine or self.ctx.neb_machine)
 
     def submit_geoopt(self):
-        reactant_structure_file = self.inputs.input_files.structure_list[0]
-        product_structure_file = self.inputs.input_files.structure_list[-1]
-        for i, structure_file in enumerate([reactant_structure_file, product_structure_file]):
-            atoms = read(structure_file)
-            atoms.set_cell(self.ctx.cell)
-            atoms.set_pbc(self.ctx.pbc)
-            inputclass = GeooptInputSets(atoms, config=self.inputs.input_files.geoopt_config_file,
-                                         kind_section_config=self.inputs.input_files.kind_section_file)
-            pre = GeooptPreprocessor(inputclass, self.ctx.machine)
-            builder = pre.builder
-            node = self.submit(builder)
-            if i == 0:
-                self.to_context(geoopt_for_reactant_workchain=node)
-            elif i == 1:
-                self.to_context(geoopt_for_product_workchain=node)
+        reactant = self.inputs.structures['image_0']
+        self.ctx.image_last_index = len(self.inputs.structures) - 1
+        product = self.inputs.structures[f'image_{self.ctx.image_last_index}']
+        node_reactant = self.submit(GeooptSingleWorkChain, structure=reactant,
+                                    **self.exposed_inputs(GeooptSingleWorkChain, namespace='geoopt'))
+        node_product = self.submit(GeooptSingleWorkChain, structure=product,
+                                   **self.exposed_inputs(GeooptSingleWorkChain, namespace='geoopt'))
+        return ToContext(geoopt_reactant_workchain=node_reactant, geoopt_product_workchain=node_product)
 
     def inspect_geoopt(self):
-        # TODO: use return exitcode instead of assert
-        # geoopt_is_finished_ok = []
-        for node in [self.ctx.geoopt_for_reactant_workchain, self.ctx.geoopt_for_product_workchain]:
-            assert node.is_finished_ok
-        # return all(geoopt_is_finished_ok)
+        inspect_node(self.ctx.geoopt_reactant_workchain)
+        self.out_many(
+            self.exposed_outputs(self.ctx.geoopt_reactant_workchain, GeooptSingleWorkChain, namespace='reactant')
+        )
+        inspect_node(self.ctx.geoopt_product_workchain)
+        self.out_many(
+            self.exposed_outputs(self.ctx.geoopt_product_workchain, GeooptSingleWorkChain, namespace='product')
+        )
 
     def submit_neb(self):
-        atoms_list = []
-        for node in self.ctx.geoopt_workchain:
-            with node.outputs.retrieved.open('aiida-pos-1.xyz') as structure_file:
-                atoms_list.append(get_last_frame(structure_file, format='xyz', cell=self.ctx.cell, pbc=self.ctx.pbc))
-        # pre setup inputclass
-        inputclass = NebInputSets(atoms_list[0], config=self.inputs.input_files.neb_config_file,
-                                  kind_section_config=self.inputs.input_files.kind_section_file)
-        # setup replica in cp2k
-        replica_dict = {}
-        for replica_index, atoms in enumerate(atoms_list):
-            replica_name = f'image_{replica_index}.xyz'
-            atoms.write(replica_name)
-            replica_dict.update({f'image_{replica_index}': SinglefileData(file=abspath(replica_name))})
-            inputclass.add_config({'MOTION': {'BAND': {'REPLICA': [{'COORD_FILE_NAME': replica_name}]}}})
-
-        pre = NebPreprocessor(inputclass, self.ctx.machine)
-        builder = pre.builder
-        builder.cp2k.file = replica_dict
-        node = self.submit(builder)
+        structures_geoopt = {}
+        reactant_geoopt = self.ctx.geoopt_reactant_workchain.outputs.structure_geoopt
+        product_geoopt = self.ctx.geoopt_product_workchain.outputs.structure_geoopt
+        structures_geoopt.update({'image_0': reactant_geoopt, f'image_{self.ctx.image_last_index}': product_geoopt})
+        for image_index in range(1, self.ctx.image_last_index):
+            structures_geoopt.update({f'image_{image_index}': self.inputs.structures[f'image_{image_index}']})
+        node = self.submit(NebSingleWorkChain, structures=structures_geoopt,
+                           **self.exposed_inputs(NebSingleWorkChain, namespace='neb'))
         self.to_context(neb_workchain=node)
 
     def inspect_neb(self):
-        # TODO: check convergence in BAND.out,
-        #       test a job which walltime is reached
-        node = self.ctx.neb_workchain
-        assert node.is_finished_ok
-        # return node.is_finished_ok
-
-    def get_energy_curve_data(self):
-        self.ctx.energy_curve_file_name = 'Replica_data_for_energy_curve.xyz'
-        node = self.ctx.neb_workchain
-        # get list of atoms
-        replica_traj_list = []
-        number_of_replica = self.ctx.neb_config['MOTION']['BAND']['NUMBER_OF_REPLICA']
-        for i in range(1, number_of_replica + 1):
-            # warning: if project name is not 'aiida', this part will fail
-            with node.outputs.retrieved.open(f'aiida-pos-Replica_nr_{i}-1.xyz') as replica_file:
-                replica_traj_list.append(read(replica_file, format='xyz'))
-        get_traj_for_energy_curve(replica_traj_list, write_name=self.ctx.energy_curve_file_name)
+        inspect_node(self.ctx.neb_workchain)
+        self.out_many(
+            self.exposed_outputs(self.ctx.neb_workchain, NebSingleWorkChain)
+        )
 
     def submit_frequency(self):
-        self.ctx.transition_state_file_name = 'Transition_State.xyz'
-        get_max_energy_frame(traj_file=self.ctx.energy_curve_file_name, write_name=self.ctx.transition_state_file_name,
-                             cell=self.ctx.cell, pbc=self.ctx.pbc)
-        atoms = read(self.ctx.transition_state_file_name)
-        inputclass = FrequencyInputSets(atoms, config=self.inputs.input_files.frequency_config_file,
-                                        kind_section_config=self.inputs.input_files.kind_section_file)
-        pre = FrequencyPreprocessor(inputclass, self.ctx.machine)
-        builder = pre.builder
-        node = self.submit(builder)
+        transition_state = self.ctx.neb_workchain.outputs.transition_state
+        node = self.submit(FrequencySingleWorkChain, structure=transition_state,
+                           **self.exposed_inputs(FrequencySingleWorkChain, namespace='frequency'))
         self.to_context(frequency_workchain=node)
 
     def inspect_frequency(self):
-        node = self.ctx.frequency_workchain
-        assert node.is_finished_ok
-        # return node.is_finished_ok
+        inspect_node(self.ctx.frequency_workchain)
+        self.out_many(
+            self.exposed_outputs(self.ctx.frequency_workchain, FrequencySingleWorkChain)
+        )
 
-    def get_frequency_data(self):
-        self.ctx.frequency_data_file_name = 'frequency_data.txt'
-        node = self.ctx.frequency_workchain
-        output_content = node.outputs.retrieved.get_object_content('aiida.out')
-        frequency_data = "\n".join(re.findall(r'VIB\|Frequency.*', output_content))
-        with open(self.ctx.frequency_data_file_name, 'w') as frequency_data_file:
-            frequency_data_file.write(frequency_data)
+    def write_outputs(self):
+        if isabs(self.inputs.workdir):
+            chdir(self.inputs.workdir)
+            # write geoopt structures
+            reactant_geoopt = self.outputs.reactant.structure_geoopt
+            reactant_geoopt.get_ase().write('reactant_geoopt.xyz')
+            product_geoopt = self.outputs.product.structure_geoopt
+            product_geoopt.get_ase().write('product_geoopt.xyz')
+            # write trajactory for energy curve
+            traj_data = self.outputs.traj_for_energy_curve
+            energy_array = traj_data.get_array('energy')
+            traj = []
+            for structure_index in traj_data.get_stepids():
+                structure = traj_data.get_step_structure(structure_index)
+                energy = energy_array[structure_index]
+                atoms = structure.get_ase()
+                atoms.info.update({'i': structure_index, 'E': energy})
+                traj.append(atoms)
+            write('traj_for_energy_curve.xyz', traj)
+            # write transition state structure
+            transition_state = self.outputs.transition_state
+            transition_state.get_ase().write('transition_state.xyz')
+            # write vibrational frequency value
+            freq_data = self.outputs.vibrational_frequency
+            freq_list = freq_data.get_list()
+            savetxt('frequency.txt', freq_list, fmt='%-15s%-15s%-15s', header='VIB|Frequency (cm^-1)')
+        else:
+            raise ValueError('workdir need be a absolute path')

@@ -1,4 +1,4 @@
-from ecint.workflow.neb import NebWorkChain
+from ecint.workflow.units.base import NebSingleWorkChain
 from ase.io import read
 from aiida.orm import StructureData, List
 from aiida.engine import run
@@ -14,4 +14,4 @@ for i, structure_file in enumerate(structure_file_list):
     structures.update({f'image_{i}': structure})
 
 input_paras = {'structures': structures}
-run(NebWorkChain, **input_paras)
+run(NebSingleWorkChain, **input_paras)
