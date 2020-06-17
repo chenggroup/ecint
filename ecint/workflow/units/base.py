@@ -77,8 +77,10 @@ class GeooptSingleWorkChain(BaseSingleWorkChain):
         inspect_node(self.ctx.geoopt_workchain)
 
     def get_structure_geoopt(self):
-        self.ctx.structure_geoopt = self.ctx.geoopt_workchain.outputs.output_structure
-        self.out('structure_geoopt', self.ctx.structure_geoopt)
+        structure_geoopt = self.ctx.geoopt_workchain.outputs.output_structure.clone()
+        energy = self.ctx.geoopt_workchain.outputs.output_parameters.get_attribute('energy')
+        structure_geoopt.set_attribute('energy', energy)
+        self.out('structure_geoopt', structure_geoopt.store())
 
 
 class NebSingleWorkChain(BaseSingleWorkChain):
@@ -166,7 +168,10 @@ class NebSingleWorkChain(BaseSingleWorkChain):
     def get_transition_state(self):
         traj_data = self.ctx.traj_for_energy_curve
         structure_list = [traj_data.get_step_structure(i) for i in traj_data.get_stepids()]
-        structure_with_max_energy = structure_list[traj_data.get_array('energy').argmax()]
+        energy_array = traj_data.get_array('energy')
+        structure_with_max_energy = structure_list[energy_array.argmax()]
+        max_energy = energy_array.max()
+        structure_with_max_energy.set_attribute('energy', max_energy)
         self.out('transition_state', structure_with_max_energy.store())  # output type StructureData
 
 

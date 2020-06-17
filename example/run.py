@@ -8,7 +8,7 @@ load_profile()
 
 
 def submit_workchain(input_paras, cell=None, pbc=None):
-    if input_paras['structures_list'][0].endwith('.xyz'):
+    if input_paras['structures_list'][0].endswith('.xyz'):
         if (cell is None) or (pbc is None):
             raise ValueError('You should set up cell and pbc')
     structures = {}
@@ -27,6 +27,8 @@ if __name__ == '__main__':
     cell = [12, 12, 12]
     pbc = False
 
+    if not os.path.exists(results_dir):
+        os.mkdir(results_dir)
     input_paras = {'structures_list': structure_file_list, 'workdir': os.path.abspath(results_dir)}
     print('START')
     print(f'Now in {os.getcwd()}')

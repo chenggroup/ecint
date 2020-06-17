@@ -1,11 +1,12 @@
 from os import chdir
 from os.path import join, abspath, isabs
+from warnings import warn
 from numpy import savetxt
 from ase.io import read, write
 from aiida.orm import StructureData
 from aiida.engine import WorkChain, ExitCode, ToContext, if_
 from ecint.preprocessor import test_machine
-from ecint.preprocessor.utils import load_json, load_machine, check_neb, inspect_node
+from ecint.preprocessor.utils import load_json, load_machine, check_neb, inspect_node, is_valid_workdir
 from ecint.workflow.units import CONFIG_DIR
 from ecint.workflow.units.base import GeooptSingleWorkChain, NebSingleWorkChain, FrequencySingleWorkChain
 
@@ -17,7 +18,8 @@ class NebWorkChain(WorkChain):
         # use structures.image_0 as reactant, image_1 as next point in energy curve, and so on
         # the last image_N as product
         spec.input_namespace('structures', valid_type=StructureData, dynamic=True)
-        spec.input('workdir', valid_type=(str, type(None)), default=None, required=False, non_db=True)
+        spec.input('workdir', valid_type=(str, type(None)), default=None, required=False, non_db=True,
+                   validator=is_valid_workdir)
 
         # set global input files, default is None
         spec.input('kind_section_file', valid_type=(str, type(None)), default=None, required=False, non_db=True)
@@ -52,7 +54,7 @@ class NebWorkChain(WorkChain):
             cls.inspect_neb,
             cls.submit_frequency,
             cls.inspect_frequency,
-            if_(cls.inputs.workdir)(
+            if_(cls.validate_workdir)(
                 cls.write_outputs,
             ),
         )
@@ -133,31 +135,35 @@ class NebWorkChain(WorkChain):
             self.exposed_outputs(self.ctx.frequency_workchain, FrequencySingleWorkChain)
         )
 
+    def validate_workdir(self):
+        return self.inputs.workdir
+
     def write_outputs(self):
-        if isabs(self.inputs.workdir):
-            chdir(self.inputs.workdir)
-            # write geoopt structures
-            reactant_geoopt = self.outputs.reactant.structure_geoopt
-            reactant_geoopt.get_ase().write('reactant_geoopt.xyz')
-            product_geoopt = self.outputs.product.structure_geoopt
-            product_geoopt.get_ase().write('product_geoopt.xyz')
-            # write trajactory for energy curve
-            traj_data = self.outputs.traj_for_energy_curve
-            energy_array = traj_data.get_array('energy')
-            traj = []
-            for structure_index in traj_data.get_stepids():
-                structure = traj_data.get_step_structure(structure_index)
-                energy = energy_array[structure_index]
-                atoms = structure.get_ase()
-                atoms.info.update({'i': structure_index, 'E': energy})
-                traj.append(atoms)
-            write('traj_for_energy_curve.xyz', traj)
-            # write transition state structure
-            transition_state = self.outputs.transition_state
-            transition_state.get_ase().write('transition_state.xyz')
-            # write vibrational frequency value
-            freq_data = self.outputs.vibrational_frequency
-            freq_list = freq_data.get_list()
-            savetxt('frequency.txt', freq_list, fmt='%-15s%-15s%-15s', header='VIB|Frequency (cm^-1)')
-        else:
-            raise ValueError('workdir need be a absolute path')
+        chdir(self.inputs.workdir)
+        # write geoopt structures
+        reactant_geoopt = self.outputs['reactant']['structure_geoopt']
+        reactant_geoopt_atoms = reactant_geoopt.get_ase()
+        reactant_geoopt_atoms.info.update({'E': reactant_geoopt.get_attribute('energy')})
+        product_geoopt = self.outputs['product']['structure_geoopt']
+        product_geoopt_atoms = product_geoopt.get_ase()
+        product_geoopt_atoms.info.update({'E': product_geoopt.get_attribute('energy')})
+        reactant_geoopt_atoms.write('reactant_geoopt.xyz')
+        product_geoopt_atoms.write('product_geoopt.xyz')
+        # write trajactory for energy curve
+        traj_data = self.outputs['traj_for_energy_curve']
+        energy_array = traj_data.get_array('energy')
+        traj = []
+        for structure_index in traj_data.get_stepids():
+            structure = traj_data.get_step_structure(structure_index)
+            energy = energy_array[structure_index]
+            atoms = structure.get_ase()
+            atoms.info.update({'i': structure_index, 'E': energy})
+            traj.append(atoms)
+        write('traj_for_energy_curve.xyz', traj)
+        # write transition state structure
+        transition_state = self.outputs['transition_state']
+        transition_state.get_ase().write('transition_state.xyz')
+        # write vibrational frequency value
+        freq_data = self.outputs['vibrational_frequency']
+        freq_list = freq_data.get_list()
+        savetxt('frequency.txt', freq_list, fmt='%-15s%-15s%-15s', header='VIB|Frequency (cm^-1)')

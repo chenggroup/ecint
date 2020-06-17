@@ -1,4 +1,5 @@
 from copy import deepcopy
+from os.path import isabs, isdir, exists
 import requests
 import json
 import yaml
@@ -18,6 +19,18 @@ def load_yaml(yaml_path):
     with open(yaml_path) as f:
         d = yaml.load(f, Loader=SafeLoader)
     return d
+
+
+def is_valid_workdir(workdir):
+    if workdir is None:
+        pass
+    else:
+        if not isdir(workdir):
+            return 'workdir need be a directory'
+        if not isabs(workdir):
+            return 'workdir need be a absolute path'
+        if not exists(workdir):
+            return 'workdir is not exists'
 
 
 def update_dict(nested_dict, item):
