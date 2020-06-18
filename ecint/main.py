@@ -74,7 +74,7 @@ def main():
     # if workdir is not None:
     #     input_paras.update({'workdir': workdir})
     # TODO: make this part more general for other workflows
-    user_input = load_json('test_run.json')
+    user_input = load_json('ecint.json')
     workdir = os.path.abspath(user_input['workdir'])
     print(f'ECINT start in {os.getcwd()}')
     if not os.path.exists(workdir):
