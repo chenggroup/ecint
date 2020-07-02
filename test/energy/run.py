@@ -1,7 +1,9 @@
 import os
+
+from aiida import load_profile
 from aiida.engine import run
 from energy import EnergyWorkChain
-from aiida import load_profile
+
 load_profile()
 
 print('START')

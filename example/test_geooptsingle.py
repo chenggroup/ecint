@@ -1,8 +1,10 @@
-from ecint.workflow.units.base import GeooptSingleWorkChain
-from ase.io import read
-from aiida.orm import StructureData
-from aiida.engine import run
 from aiida import load_profile
+from aiida.engine import run
+from aiida.orm import StructureData
+from ase.io import read
+
+from ecint.workflow.units.base import GeooptSingleWorkChain
+
 load_profile()
 
 atoms = read('ethane.xyz')

@@ -1,5 +1,6 @@
-from ecint.preprocessor.input import EnergyInputSets, GeooptInputSets, NebInputSets, FrequencyInputSets
 from ase.build import molecule
+
+from ecint.preprocessor.input import FrequencyInputSets
 
 atoms = molecule('H2O')
 atoms.center(vacuum=2.0)

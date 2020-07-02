@@ -1,12 +1,11 @@
 import os
-from time import sleep
-import multiprocessing
-from ase.io import read
-from ecint.workflow import *
-from aiida.orm import StructureData
-from aiida.engine import run_get_node, submit
-from ecint.preprocessor.utils import notification_in_dingtalk, load_json
+
 from aiida import load_profile
+from aiida.engine import run_get_node
+from aiida.orm import StructureData
+from ase.io import read
+
+from ecint.preprocessor.utils import notification_in_dingtalk, load_json
 
 load_profile()
 

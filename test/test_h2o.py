@@ -8,17 +8,13 @@
 ###############################################################################
 """Run simple DFT calculation."""
 
-import os
-import sys
-import click
 from time import sleep
 
+from aiida import load_profile
+from aiida.engine import run_get_node
+from aiida.orm import (Code, Dict, StructureData)
 from ase.build import molecule
 
-from aiida.engine import run_get_node
-from aiida.orm import (Code, Dict, SinglefileData, StructureData)
-from aiida.common import NotExistent
-from aiida import load_profile
 load_profile()
 
 
@@ -99,6 +95,6 @@ def example_dft(cp2k_code):
     notification_in_dingtalk(webhook, node)
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     code = Code.get_from_string('cp2k@chenglab52')
     example_dft(code)

@@ -1,8 +1,17 @@
 {
   "workflow": "NebWorkChain",
   "workdir": "resutls_2",
-  "structures": ["ethane_1_opt.xyz", "ethane_s1.xyz", "ethane_ts.xyz", "ethane_s2.xyz"],
-  "cell": [12, 12, 12],
+  "structures": [
+    "ethane_1_opt.xyz",
+    "ethane_s1.xyz",
+    "ethane_ts.xyz",
+    "ethane_s2.xyz"
+  ],
+  "cell": [
+    12,
+    12,
+    12
+  ],
   "pbc": false,
   "webhook": "https://oapi.dingtalk.com/robot/send?access_token=a3cd7e35c31f149248a46053f51b11ad843cc50a975730e565cb3f0292f8e56b"
 }

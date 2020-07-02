@@ -1,13 +1,12 @@
 from os import chdir
-from os.path import join, abspath, isabs
-from warnings import warn
-from numpy import savetxt
-from ase.io import read, write
+from os.path import abspath
+
+from aiida.engine import WorkChain, ToContext, if_
 from aiida.orm import StructureData
-from aiida.engine import WorkChain, ExitCode, ToContext, if_
-from ecint.preprocessor import test_machine
+from ase.io import write
+from numpy import savetxt
+
 from ecint.preprocessor.utils import load_json, load_machine, check_neb, inspect_node, is_valid_workdir
-from ecint.workflow.units import CONFIG_DIR
 from ecint.workflow.units.base import GeooptSingleWorkChain, NebSingleWorkChain, FrequencySingleWorkChain
 
 

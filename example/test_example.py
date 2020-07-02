@@ -1,7 +1,6 @@
 from aiida import load_profile
-from aiida.engine import run
 from aiida.orm import Dict, Code, StructureData
-from aiida.plugins import CalculationFactory, WorkflowFactory
+from aiida.plugins import WorkflowFactory
 
 from ecint.preprocessor import path2structure
 from ecint.preprocessor.input import InputSetsFromFile

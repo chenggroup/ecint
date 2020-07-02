@@ -1,6 +1,8 @@
 from abc import ABCMeta, abstractmethod
-from ase import Atoms
+
 from aiida.orm import StructureData
+from ase import Atoms
+
 from ecint.preprocessor.utils import load_yaml
 
 _E_WITH_Q = {'H': '1', 'He': '2', 'Li': '3', 'Be': '4', 'B': '3', 'C': '4', 'N': '5', 'O': '6', 'F': '7', 'Ne': '8',

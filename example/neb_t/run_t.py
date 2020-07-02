@@ -1,9 +1,11 @@
 import os
 from time import sleep
-from ecint.workflow import NebWorkChain
-from ecint.preprocessor.utils import notification_in_dingtalk
-from aiida.engine import run_get_node, submit
+
 from aiida import load_profile
+from aiida.engine import submit
+
+from ecint.preprocessor.utils import notification_in_dingtalk
+from ecint.workflow import NebWorkChain
 
 load_profile()
 
@@ -24,6 +26,6 @@ print(f'Now in {os.getcwd()}')
 node = submit(NebWorkChain, **input_paras)
 # add dingtalk notification
 while not node.is_terminated:
-    sleep(5*60)
+    sleep(5 * 60)
 notification_in_dingtalk(webhook, node)
 print('END')

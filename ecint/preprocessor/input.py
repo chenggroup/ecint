@@ -1,13 +1,11 @@
 import os
-from abc import ABCMeta, abstractmethod
 from copy import deepcopy
-from collections import OrderedDict
 
 from aiida_cp2k.utils import Cp2kInput
 
-from ecint.preprocessor.utils import load_json, update_dict
 from ecint.preprocessor.kind import *
 from ecint.preprocessor.kind import BaseSets
+from ecint.preprocessor.utils import load_json, update_dict
 from ecint.workflow.units import CONFIG_DIR
 
 

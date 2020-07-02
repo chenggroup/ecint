@@ -2,8 +2,8 @@ from aiida.engine import WorkChain, ToContext, ExitCode
 from aiida.orm import Dict
 from ase.io import read
 
-from ecint.preprocessor.input import InputSetsFromFile
 from ecint.preprocessor import LSFPreprocessor
+from ecint.preprocessor.input import InputSetsFromFile
 
 
 class EnergyInputSets(InputSetsFromFile):

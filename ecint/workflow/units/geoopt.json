@@ -80,64 +80,64 @@
         }
       },
       "XC": {
-          "XC_FUNCTIONAL": {
-            "_": "PBE"
-          },
-          "VDW_POTENTIAL": {
-            "DISPERSION_FUNCTIONAL": "PAIR_POTENTIAL",
-            "PAIR_POTENTIAL": {
-              "TYPE": "DFTD3",
-              "PARAMETER_FILE_NAME": "dftd3.dat",
-              "REFERENCE_FUNCTIONAL": "PBE"
-            }
-          }
+        "XC_FUNCTIONAL": {
+          "_": "PBE"
         },
-      "PRINT": {
-          "E_DENSITY_CUBE": {
-            "ADD_LAST": "NUMERIC",
-            "EACH": {
-              "GEO_OPT": 0
-            }
-          },
-          "PDOS": {
-            "COMPONENTS": "",
-            "NLUMO": -1,
-            "ADD_LAST": "NUMERIC",
-            "EACH": {
-              "MD": 50,
-              "GEO_OPT": 0
-            },
-            "COMMON_ITERATION_LEVELS": 0,
-            "APPEND": "T"
-          },
-          "MO_CUBES": {
-            "NHOMO": 10,
-            "NLUMO": 10,
-            "WRITE_CUBE": "F",
-            "ADD_LAST": "NUMERIC",
-            "EACH": {
-              "MD": 50,
-              "GEO_OPT": 0
-            }
-          },
-          "V_HARTREE_CUBE": {
-            "_": "ON",
-            "APPEND": "T",
-            "EACH": {
-              "MD": 50,
-              "GEO_OPT": 0
-            },
-            "ADD_LAST": "NUMERIC"
+        "VDW_POTENTIAL": {
+          "DISPERSION_FUNCTIONAL": "PAIR_POTENTIAL",
+          "PAIR_POTENTIAL": {
+            "TYPE": "DFTD3",
+            "PARAMETER_FILE_NAME": "dftd3.dat",
+            "REFERENCE_FUNCTIONAL": "PBE"
           }
-        }
-    },
-    "PRINT": {
-        "STRESS_TENSOR": {
-          "_": ""
         }
       },
-    "SUBSYS": {
-        "KIND": []
+      "PRINT": {
+        "E_DENSITY_CUBE": {
+          "ADD_LAST": "NUMERIC",
+          "EACH": {
+            "GEO_OPT": 0
+          }
+        },
+        "PDOS": {
+          "COMPONENTS": "",
+          "NLUMO": -1,
+          "ADD_LAST": "NUMERIC",
+          "EACH": {
+            "MD": 50,
+            "GEO_OPT": 0
+          },
+          "COMMON_ITERATION_LEVELS": 0,
+          "APPEND": "T"
+        },
+        "MO_CUBES": {
+          "NHOMO": 10,
+          "NLUMO": 10,
+          "WRITE_CUBE": "F",
+          "ADD_LAST": "NUMERIC",
+          "EACH": {
+            "MD": 50,
+            "GEO_OPT": 0
+          }
+        },
+        "V_HARTREE_CUBE": {
+          "_": "ON",
+          "APPEND": "T",
+          "EACH": {
+            "MD": 50,
+            "GEO_OPT": 0
+          },
+          "ADD_LAST": "NUMERIC"
+        }
       }
+    },
+    "PRINT": {
+      "STRESS_TENSOR": {
+        "_": ""
+      }
+    },
+    "SUBSYS": {
+      "KIND": []
+    }
   }
 }

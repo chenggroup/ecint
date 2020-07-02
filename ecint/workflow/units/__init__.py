@@ -1,7 +1,9 @@
 import os
-from aiida_cp2k.calculations import Cp2kCalculation
-from aiida.orm import Dict, StructureData, Code
+
 from aiida.engine import run
+from aiida.orm import Dict, StructureData, Code
+from aiida_cp2k.calculations import Cp2kCalculation
+
 from ecint.preprocessor.utils import load_json, load_machine, check_neb
 
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))

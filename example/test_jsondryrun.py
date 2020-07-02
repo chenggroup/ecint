@@ -1,5 +1,6 @@
 from aiida import load_profile
 from ase.build import molecule
+
 from ecint.preprocessor.input import NebInputSets
 from ecint.workflow.units import JsonDryRun
 

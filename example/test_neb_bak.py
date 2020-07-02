@@ -1,27 +1,23 @@
 from time import sleep
+
+import numpy as np
+from aiida import load_profile
+from aiida.engine import ToContext
+from aiida.engine import while_, if_
+from aiida.orm import (Dict, SinglefileData)
+from aiida_cp2k.workchains import Cp2kBaseWorkChain
 from ase import Atoms
 from ase.io import write
+
 from ecint.postprocessor import get_last_frame
-from aiida.common import AttributeDict
-from aiida.engine import submit, ToContext
-from aiida.orm import Dict
-from aiida_cp2k.calculations import Cp2kCalculation
-from aiida_cp2k.workchains import Cp2kBaseWorkChain
-from aiida.engine import while_, if_
-from aiida.plugins import CalculationFactory
+from ecint.preprocessor import LSFPreprocessor
 # from ecint.preprocessor import GeooptPreprocessor, NebPreprocessor, FrequencyPreprocessor
 from ecint.preprocessor.input import InputSetsFromFile
-from ecint.preprocessor import LSFPreprocessor
-from ecint.preprocessor.input import GeooptInputSets, NebInputSets, FrequencyInputSets
-from aiida_cp2k.workchains.aiida_base_restart import BaseRestartWorkChain
-from ase.io import read
-from aiida.plugins import WorkflowFactory
-from aiida.orm import (Code, Dict, SinglefileData)
-from aiida.engine import run
-from aiida import load_profile
-import numpy as np
+from ecint.preprocessor.input import NebInputSets
 
 load_profile()
+
+
 # Cp2kCalculation = CalculationFactory('cp2k')
 
 
@@ -55,7 +51,7 @@ class NebWorkChain(Cp2kBaseWorkChain):
         spec.outline(
             cls.submit_workchain,
             if_(not cls.ctx.workchain.is_finished_ok)(
-                while_(not cls.ctx.workchain.is_finished_ok)(sleep(5*60)),
+                while_(not cls.ctx.workchain.is_finished_ok)(sleep(5 * 60)),
                 # 下面两个方法是关于后处理的部分
                 cls.get_traj_for_energy_curve,
                 cls.get_max_energy_frame,

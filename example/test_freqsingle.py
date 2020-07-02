@@ -1,8 +1,9 @@
-from ecint.workflow.units.base import FrequencySingleWorkChain
-from ase.io import read
-from aiida.orm import StructureData, List, load_node
-from aiida.engine import run
 from aiida import load_profile
+from aiida.engine import run
+from aiida.orm import load_node
+
+from ecint.workflow.units.base import FrequencySingleWorkChain
+
 load_profile()
 
 node = load_node(1648)

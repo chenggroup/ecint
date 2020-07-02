@@ -1,15 +1,5 @@
-import os
-import sys
-
-from aiida.engine import run
-from aiida.orm import Code, Dict, SinglefileData, StructureData
-from aiida.common import NotExistent
-from aiida.plugins import WorkflowFactory
-from aiida.common import AttributeDict
 from aiida.engine import while_
-from aiida.plugins import CalculationFactory
-
-from aiida_cp2k.workchains.aiida_base_restart import BaseRestartWorkChain
+from aiida.plugins import WorkflowFactory
 
 Cp2kBaseWorkChain = WorkflowFactory('cp2k.base')
 

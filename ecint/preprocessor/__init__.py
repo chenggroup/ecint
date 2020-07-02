@@ -1,13 +1,11 @@
 from abc import ABCMeta, abstractmethod
-from ase import Atoms
+
 from aiida.orm import Dict, Code, StructureData
 # from aiida.plugins import WorkflowFactory
 from aiida_cp2k.workchains import Cp2kBaseWorkChain
+from ase import Atoms
 
 from ecint.preprocessor.utils import load_machine, get_procs_per_node_from_code_name, check_neb
-
-default_machine = {'code@computer': 'cp2k@aiida_test', 'nnode': 2, 'walltime': 12*60*60, 'queue': 'medium'}
-test_machine = {'code@computer': 'cp2k@aiida_test', 'nnode': 1, 'walltime': 20*60, 'queue': 'small'}
 
 
 class Preprocessor(metaclass=ABCMeta):

@@ -1,5 +1,6 @@
-import requests
 import json
+
+import requests
 
 
 def notification_in_dingtalk(webhook, node):
@@ -20,9 +21,10 @@ def notification_in_dingtalk(webhook, node):
     return response
 
 
-if __name__=='__main__':
+if __name__ == '__main__':
     from aiida.orm import load_node
     from aiida import load_profile
+
     load_profile()
     webhook = 'https://oapi.dingtalk.com/robot/send?access_token=a3cd7e35c31f149248a46053f51b11ad843cc50a975730e565cb3f0292f8e56b'
     node = load_node(1144)

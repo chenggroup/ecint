@@ -1,10 +1,12 @@
 from os.path import join
-from aiida.orm import StructureData, Dict, Code
-from aiida.engine import run, submit
-from ecint.workflow.units import CONFIG_DIR
-from ecint.preprocessor.utils import load_json, update_dict
-from ase.io import read
+
 from aiida import load_profile
+from aiida.engine import submit
+from aiida.orm import StructureData, Dict, Code
+from ase.io import read
+
+from ecint.preprocessor.utils import load_json, update_dict
+from ecint.workflow.units import CONFIG_DIR
 
 load_profile()
 

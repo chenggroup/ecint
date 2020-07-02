@@ -1,8 +1,10 @@
-from ecint.workflow.neb import NebWorkChain
-from ase.io import read
-from aiida.orm import StructureData, List
-from aiida.engine import run
 from aiida import load_profile
+from aiida.engine import run
+from aiida.orm import StructureData
+from ase.io import read
+
+from ecint.workflow.neb import NebWorkChain
+
 load_profile()
 
 structure_file_list = ['ethane_1_opt.xyz', 'ethane_s1.xyz', 'ethane_ts.xyz', 'ethane_s2.xyz']

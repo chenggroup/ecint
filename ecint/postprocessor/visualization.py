@@ -60,7 +60,6 @@ def get_provenance_graph(pk, level, annotate_links=None, graph_attr=None):
             annotate_links = 'both'
         graph.recurse_descendants(
             pk,
-            origin_style=None,
             include_process_inputs=True,
             annotate_links=annotate_links,
         )

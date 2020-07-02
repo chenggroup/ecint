@@ -1,13 +1,10 @@
-from ecint.preprocessor import GeooptPreprocessor, EnergyPreprocessor
-from ecint.preprocessor.input import GeooptInputSets, EnergyInputSets
-from ecint.preprocessor import LSFPreprocessor
-from ase.io import read
-from ase.build import molecule
-from aiida.plugins import WorkflowFactory
-from aiida.orm import (Code, Dict, SinglefileData, Str)
-from aiida.engine import run, submit
-
 from aiida import load_profile
+from aiida.engine import submit
+from aiida.orm import (Str)
+from ase.io import read
+
+from ecint.preprocessor import EnergyPreprocessor
+from ecint.preprocessor.input import EnergyInputSets
 
 load_profile()
 

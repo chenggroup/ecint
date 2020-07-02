@@ -1,14 +1,16 @@
-from os.path import join, abspath
 import re
+from os.path import join, abspath
+
 import numpy as np
-from ase.io import read
 from aiida.engine import WorkChain
 from aiida.orm import StructureData, TrajectoryData, List
-from ecint.workflow.units import CONFIG_DIR
-from ecint.preprocessor.utils import load_json, load_machine, inspect_node, check_neb
-from ecint.preprocessor import default_machine, test_machine, EnergyPreprocessor, GeooptPreprocessor, NebPreprocessor, \
+from ase.io import read
+
+from ecint.preprocessor import GeooptPreprocessor, NebPreprocessor, \
     FrequencyPreprocessor
-from ecint.preprocessor.input import EnergyInputSets, GeooptInputSets, NebInputSets, FrequencyInputSets
+from ecint.preprocessor.input import GeooptInputSets, NebInputSets, FrequencyInputSets
+from ecint.preprocessor.utils import load_json, load_machine, inspect_node, check_neb
+from ecint.workflow.units import CONFIG_DIR
 
 
 class BaseSingleWorkChain(WorkChain):

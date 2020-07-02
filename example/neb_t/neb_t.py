@@ -1,16 +1,16 @@
-from os.path import abspath, join, isabs
-from os import chdir, getcwd
 import re
+from os import chdir, getcwd
+from os.path import join, isabs
 
-from aiida.engine import WorkChain, append_
-from aiida.orm import SinglefileData, StructureData, List
+from aiida.engine import WorkChain
+from aiida.orm import List
 from ase.io import read
 
-from ecint.workflow.units import CONFIG_DIR
-from ecint.postprocessor import get_last_frame, get_traj_for_energy_curve, get_max_energy_frame
+from ecint.postprocessor import get_traj_for_energy_curve, get_max_energy_frame
 from ecint.preprocessor import GeooptPreprocessor, NebPreprocessor, FrequencyPreprocessor
 from ecint.preprocessor.input import GeooptInputSets, NebInputSets, FrequencyInputSets
 from ecint.preprocessor.utils import load_json, load_machine, check_neb
+from ecint.workflow.units import CONFIG_DIR
 
 
 class NebWorkChain(WorkChain):

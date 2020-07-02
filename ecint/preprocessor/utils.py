@@ -1,12 +1,11 @@
-from copy import deepcopy
-from os.path import isabs, isdir, exists
-import requests
 import json
-import yaml
-from yaml import SafeLoader
+from os.path import isabs, isdir, exists
 from warnings import warn
-from ase.io import read
+
+import requests
+import yaml
 from aiida.orm import Computer
+from yaml import SafeLoader
 
 
 def load_json(json_path):
@@ -124,7 +123,8 @@ def load_machine(machine_config):
         raise KeyError('You must set `nnode` or `nprocs` to appoint computing resources')
     restrict_machine.update({'tot_num_mpiprocs': nprocs})
     # set `walltime`
-    if not (('walltime' in _machine) or ('max_wallclock_seconds' in _machine) or ('W' in _machine) or ('w' in _machine)):
+    if not (('walltime' in _machine) or ('max_wallclock_seconds' in _machine) or ('W' in _machine) or (
+            'w' in _machine)):
         warn('You should set `walltime`, otherwise your job may waste computing resources', Warning)
     else:
         walltime = _machine.get('walltime') or _machine.get('max_wallclock_seconds') \
