@@ -1,10 +1,3 @@
-from abc import ABCMeta, abstractmethod
-
-from aiida.orm import StructureData
-from ase import Atoms
-
-from ecint.preprocessor.utils import load_yaml
-
 _E_WITH_Q = {'H': '1', 'He': '2', 'Li': '3', 'Be': '4', 'B': '3', 'C': '4', 'N': '5', 'O': '6', 'F': '7', 'Ne': '8',
              'Na': '9', 'Mg': '2', 'Al': '3', 'Si': '4', 'P': '5', 'S': '6', 'Cl': '7', 'Ar': '8', 'K': '9', 'Ca': '10',
              'Sc': '11', 'Ti': '12', 'V': '13', 'Cr': '14', 'Mn': '15', 'Fe': '16', 'Co': '17', 'Ni': '18', 'Cu': '11',
@@ -15,80 +8,46 @@ _E_WITH_Q = {'H': '1', 'He': '2', 'Li': '3', 'Be': '4', 'B': '3', 'C': '4', 'N':
              'Pt': '18', 'Au': '19', 'Hg': '12', 'Tl': '3', 'Pb': '4', 'Bi': '5', 'Po': '6', 'At': '7', 'Rn': '8'}
 
 
-class BaseSets(metaclass=ABCMeta):
-    def __init__(self, structure):
+class KindSection(object):
+    def __init__(self, basis_set, potential, structure=None):
         """
-        :param structure: Atoms or StructureData
+
+        Args:
+            basis_set (str): name of BASIS_SET in cp2k, such as 'DZVP-MOLOPT-SR-GTH'
+            potential (str): name of POTENTIAL in cp2k, such as 'GTH-PBE'
+            structure (aiida.orm.StructureData): structure
+
         """
-        if isinstance(structure, StructureData):
-            self.elements = structure.get_symbols_set()
-        elif isinstance(structure, Atoms):
-            self.elements = set(structure.symbols)
-        else:
-            raise TypeError('structure need be StructureData or ase Atoms')
+        self.basis_set = basis_set
+        self.potential = potential
         self.structure = structure
 
-    @property
-    @abstractmethod
-    def kind_section(self):
-        pass
-
-
-class SetsFromYaml(BaseSets):
-
-    def __init__(self, structure, kind_section_config_path):
-        super(SetsFromYaml, self).__init__(structure)
-        self.kind_section_config = self.load_kind_section_config_file(kind_section_config_path)
-
-    @property
-    def kind_section(self):
-        if self.kind_section_config.keys() == self.elements:
-            kind_section_list = []
-            for k, v in self.kind_section_config.items():
-                one_kind_section = {'_': k}
-                one_kind_section.update(v)
-                kind_section_list.append(one_kind_section)
-        else:
-            raise ValueError('Elements in input structure and configuration file do not match')
-        return kind_section_list
-
-    @staticmethod
-    def load_kind_section_config_file(kind_section_config_path):
+    def __repr__(self):
         try:
-            kind_section_config = load_yaml(kind_section_config_path)
-        except IOError:
-            print('Can not find file {}'.format(kind_section_config_path))
-        return kind_section_config
+            return str(self.kind_section)
+        except ValueError:
+            return f'<KindSection: basis_set: {self.basis_set}, potential: {self.potential}>'
 
-
-class TZV2PBLYP(BaseSets):
     @property
     def kind_section(self):
         kind_section_list = []
-        for e in self.elements:
-            one_kind_section = {'_': e, 'BASIS_SET': 'TZV2P-GTH',
-                                'POTENTIAL': 'GTH-BLYP-q{}'.format(_E_WITH_Q[e])}
+        for e in self.get_elements():
+            one_kind_section = {'_': e, 'BASIS_SET': f'{self.basis_set}',
+                                'POTENTIAL': f'{self.potential}-q{_E_WITH_Q[e]}'}
             kind_section_list.append(one_kind_section)
         return kind_section_list
 
+    def load_structure(self, structure):
+        self.structure = structure
 
-class DZVPBLYP(BaseSets):
-    @property
-    def kind_section(self):
-        kind_section_list = []
-        for e in self.elements:
-            one_kind_section = {'_': e, 'BASIS_SET': 'DZVP-MOLOPT-SR-GTH',
-                                'POTENTIAL': 'GTH-BLYP-q{}'.format(_E_WITH_Q[e])}
-            kind_section_list.append(one_kind_section)
-        return kind_section_list
+    def get_elements(self):
+        if self.structure is not None:
+            _elements = self.structure.get_symbols_set()
+        else:
+            raise ValueError('Structure is not set, please load structure first before get elements')
+        return _elements
 
 
-class DZVPPBE(BaseSets):
-    @property
-    def kind_section(self):
-        kind_section_list = []
-        for e in self.elements:
-            one_kind_section = {'_': e, 'BASIS_SET': 'DZVP-MOLOPT-SR-GTH',
-                                'POTENTIAL': 'GTH-PBE-q{}'.format(_E_WITH_Q[e])}
-            kind_section_list.append(one_kind_section)
-        return kind_section_list
+class DZVPPBE(KindSection):
+    def __init__(self, basis_set='DZVP-MOLOPT-SR-GTH', potential='GTH-PBE', structure=None):
+        super(DZVPPBE, self).__init__(basis_set, potential, structure)

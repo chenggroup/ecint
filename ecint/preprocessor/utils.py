@@ -2,10 +2,14 @@ import json
 from os.path import isabs, isdir, exists
 from warnings import warn
 
-import requests
 import yaml
 from aiida.orm import Computer
-from yaml import SafeLoader
+from aiida.orm import StructureData
+from ase import Atoms
+from ase.io import read
+
+from ecint.config import default_cp2k_machine
+from ecint.preprocessor.kind import KindSection
 
 
 def load_json(json_path):
@@ -16,28 +20,133 @@ def load_json(json_path):
 
 def load_yaml(yaml_path):
     with open(yaml_path) as f:
-        d = yaml.load(f, Loader=SafeLoader)
+        d = yaml.load(f, Loader=yaml.SafeLoader)
     return d
 
 
+def load_structure(structure, cell=None, pbc=True):
+    """
+
+    Convert various structure formats to StructureData
+
+    Args:
+        structure (StructureData or Atoms or str): structure object
+        cell (list) : cell parameters
+        pbc (bool or list[bool]): pbc in x, y, z
+
+    Returns:
+        StructureData: structure data unstored
+
+    """
+    if isinstance(structure, StructureData):
+        _structure = structure
+    elif isinstance(structure, Atoms):
+        _structure = StructureData(ase=structure)
+    elif isinstance(structure, str):
+        atoms = read(structure)
+        if not atoms.get_cell():
+            atoms.set_cell(cell)
+        atoms.set_pbc(pbc)
+        _structure = StructureData(ase=atoms)
+    else:
+        raise TypeError('Please use correct format of `structure`, ase.Atoms, aiida.orm.StructureData or '
+                        'valid structure file')
+    return _structure
+
+
+def load_config(config):
+    """
+
+    Convert various config formats to dict
+
+    Args:
+        config (dict or str): dict, .json file, .yaml file
+
+    Returns:
+        dict: config
+
+    """
+    if isinstance(config, dict):
+        config_dict = config
+    elif isinstance(config, str):
+        if config.endswith('.yaml') or config.endswith('.yml'):
+            config_dict = load_yaml(config)
+        elif config.endswith('.json'):
+            config_dict = load_json(config)
+        else:
+            raise ValueError('Config file should be .json or .yaml file')
+    else:
+        raise TypeError('Please use correct format of `config`, dict or your .json/.yaml file path')
+    return config_dict
+
+
+def load_kind(kind_section):
+    """
+
+    Convert various kind section formats to list[dict, ...]
+
+    Args:
+        kind_section (KindSection or list or dict or str): kind section object
+
+    Returns:
+        list[dict]: kind section list
+
+    """
+    if isinstance(kind_section, KindSection):
+        kind_section_list = kind_section.kind_section
+    elif isinstance(kind_section, list):
+        kind_section_list = kind_section
+    elif isinstance(kind_section, dict):
+        kind_section_list = [{'_': element, **one_kind_section} for element, one_kind_section in kind_section.items()]
+    elif isinstance(kind_section, str):
+        if kind_section.endswith('.yaml') or kind_section.endswith('.yml'):
+            _kind_section = load_yaml(kind_section)
+        elif kind_section.endswith('.json'):
+            _kind_section = load_json(kind_section)
+        else:
+            raise ValueError('Kind section file should be .json or .yaml file')
+        kind_section_list = load_kind(_kind_section)
+    else:
+        raise TypeError('Please use correct format of `kind section`, '
+                        'list (e.g. [{"_": "H", "BASIS_SET": "DZVP-MOLOPT-SR-GTH", "POTENTIAL": "GTH-PBE-q1"}, ...]), '
+                        'dict(e.g. {"H": {"BASIS_SET": "DZVP-MOLOPT-SR-GTH", "POTENTIAL": "GTH-PBE-q1"}, ...}) '
+                        'or your .json/.yaml file path')
+    return kind_section_list
+
+
 def is_valid_workdir(workdir):
+    """
+
+    Args:
+        workdir (str): path name
+
+    Returns:
+        str: error information
+
+    """
     if workdir is None:
         pass
     else:
+        if not exists(workdir):
+            return 'workdir is not exists'
         if not isdir(workdir):
             return 'workdir need be a directory'
         if not isabs(workdir):
             return 'workdir need be a absolute path'
-        if not exists(workdir):
-            return 'workdir is not exists'
 
 
 def update_dict(nested_dict, item):
-    """
-    update item to nested_dict
-    :param nested_dict:
-    :param item:
-    :return:
+    """Update method for nested dict
+
+    Update `item` to `nested_dict`, the value of `nested_dict` will be changed
+
+    Args:
+        nested_dict (dict): the dict which is waiting for change
+        item (dict): the dict which will be update to `nested_dict`
+
+    Returns:
+        None
+
     """
     for key in item:
         value = item[key]
@@ -54,8 +163,15 @@ def update_dict(nested_dict, item):
 
 def get_procs_per_node(computer):
     """
-    :param computer:
-    :return: int
+
+    Get processes/node from computer name
+
+    Args:
+        computer (str): computer name
+
+    Returns:
+        int: processes per node
+
     """
     # TODO: LSF could not support default_procs_per_node, need change method
     computer = Computer.get(name=computer)
@@ -73,8 +189,15 @@ def get_procs_per_node(computer):
 
 def get_procs_per_node_from_code_name(code_computer):
     """
-    :param code_computer: code@computer
-    :return: node_core_num: int
+
+    Get processes/node from code@computer
+
+    Args:
+        code_computer (str): `code@computer`
+
+    Returns:
+        int: processes per node
+
     """
     code, computer = code_computer.split('@')
     # TODO: Need add more computer's procs_per_node, change it to builtin config
@@ -89,22 +212,37 @@ def get_procs_per_node_from_code_name(code_computer):
     return procs_per_node
 
 
-def load_machine(machine_config):
+def load_machine(machine):
     """
-    :param machine_config: json file or yaml file or dict
-    :return:
+
+    Convert user friendly machine to restrict machine
+
+    Args:
+        machine (dict or str): dict, .json file, .yaml file
+
+    Returns:
+        dict: restrict machine
+        looks like,
+            dict={
+                'code@computer': ,
+                'tot_num_mpiprocs': ,
+                'max_wallclock_seconds': ,
+                'queue_name': ,
+                'custom_scheduler_commands':
+            }
+
     """
-    if isinstance(machine_config, dict):
-        _machine = machine_config
-    elif isinstance(machine_config, str):
-        if machine_config.endswith('.yaml') or machine_config.endswith('.yml'):
-            _machine = load_yaml(machine_config)
-        elif machine_config.endswith('.json'):
-            _machine = load_json(machine_config)
+    if isinstance(machine, dict):
+        _machine = machine
+    elif isinstance(machine, str):
+        if machine.endswith('.yaml') or machine.endswith('.yml'):
+            _machine = load_yaml(machine)
+        elif machine.endswith('.json'):
+            _machine = load_json(machine)
         else:
-            raise ValueError('machine file should be .json or .yaml file')
+            raise ValueError('Machine file should be .json or .yaml file')
     else:
-        raise ValueError('Please use correct format of `machine`, dict or your .json/.yaml file path')
+        raise TypeError('Please use correct format of `machine`, dict or your .json/.yaml file path')
     restrict_machine = {}
     # set `code@computer`
     if 'code@computer' not in _machine:
@@ -143,7 +281,7 @@ def load_machine(machine_config):
         ptile = procs_per_node
     custom_scheduler_commands = f'#BSUB -R \"span[ptile={ptile}]\"'
     restrict_machine.update({'custom_scheduler_commands': custom_scheduler_commands})
-    # return dict={'code@computer':, 'tot_num_mpiprocs': ,'max_wallclock_seconds': ,'queue_name': ,
+    # return dict={'code@computer': , 'tot_num_mpiprocs': ,'max_wallclock_seconds': ,'queue_name': ,
     # 'custom_scheduler_commands': }
     return restrict_machine
 
@@ -154,80 +292,87 @@ def inp2json(cp2k_input):
 
 
 def inspect_node(node):
-    """
-    inspect WorkChainNode is_finished_ok
-    :param node: WorkChainNode
-    :return:
+    """inspect WorkChainNode is_finished_ok
+
+    Use after running workchain, usually combine with tocontext
+
+    Args:
+        node (aiida.orm.ProcessNode): node returned by running workchain
+
+    Returns:
+        None
+
     """
     # TODO: add some ExitCode
     assert node.is_finished_ok
 
 
-def to_structure():
-    # TODO: Atoms or str to StructureData
-    pass
+def check_config_machine(config=None, machine=None, uniform_func=None):
+    """check config and machine
 
+    If you set `uniform_func`, `config` and `restrict_machine` probably be changed
 
-def check_machine():
-    # TODO: check machine for a general situation
-    pass
+    Args:
+        config (dict): input base config
+        machine (dict): input machine
+        uniform_func (function): uniform related paras in `parameters` and `restrict_machine`
 
+    Returns:
+        (dict, dict)
 
-def check_neb(parameters, restrict_machine):
+    Todo:
+        check machine for a general situation, considerate all custom situation and use a general `uniform_func`
+
     """
-    will update parameters['MOTION']['BAND']['NPROC_REP'] or restrict_machine['tot_num_mpiprocs']
-    :param parameters:
-    :param restrict_machine:
-    :return:
+    # get restrict_machine
+    if machine is None:
+        machine = default_cp2k_machine
+        warn('Auto setup machine config', Warning)
+    elif not isinstance(machine, dict):
+        raise TypeError('Machine config need be dict')
+    restrict_machine = load_machine(machine)
+    # decide whether use uniform method or not
+    if (config is not None) and (uniform_func is not None):
+        uniform_func(config=config, restrict_machine=restrict_machine)
+    print(f'Your machine config is: {restrict_machine}')
+    return config, restrict_machine
+
+
+def uniform_neb(config, restrict_machine):
+    """Uniform resource related paras in `parameters` and `restrict_machine`
+
+    Will update parameters['MOTION']['BAND']['NPROC_REP'] or restrict_machine['tot_num_mpiprocs']
+
+    Args:
+        config (dict): input parameters
+        restrict_machine (dict): restrict machine, for example, dict after `load_machine`
+
+    Returns:
+        list[bool, bool]: True if changed, False otherwise; first for parameters and second for restrict_machine
+
+    Todo:
+        See also `Todo` in `check_machine`. If there is any similar general method,
+        this method can be delete and replaced by it
+
     """
     # warning: if 'NPROC_REP' not set, than it will be setted as procs_per_node
     # set default nproc_rep as procs_per_node
     procs_per_node = get_procs_per_node_from_code_name(restrict_machine['code@computer'])
-    if parameters['MOTION']['BAND'].get('NPROC_REP'):
-        nproc_rep = parameters['MOTION']['BAND']['NPROC_REP']
+    is_changed = [False, False]  # first for parameters, second for restrict_machine
+    if config['MOTION']['BAND'].get('NPROC_REP'):
+        nproc_rep = config['MOTION']['BAND']['NPROC_REP']
     else:
-        nproc_rep = parameters['MOTION']['BAND'].setdefault('NPROC_REP', procs_per_node)
+        nproc_rep = config['MOTION']['BAND'].setdefault('NPROC_REP', procs_per_node)
+        is_changed[0] = True
         warn(f'Cause you have not set `/MOTION/BAND/NPROC_REP`, so it is setted as {nproc_rep}', ResourceWarning)
     # get number_of_replica and tot_num_mpiprocs
-    number_of_replica = parameters['MOTION']['BAND']['NUMBER_OF_REPLICA']
+    number_of_replica = config['MOTION']['BAND']['NUMBER_OF_REPLICA']
     tot_num_mpiprocs = restrict_machine['tot_num_mpiprocs']
     # check whether nproc_rep*number_of_replica == 'tot_num_mpiprocs', if not, change tot_num_mpiprocs
     if nproc_rep * number_of_replica != tot_num_mpiprocs:
         restrict_machine['tot_num_mpiprocs'] = nproc_rep * number_of_replica
+        is_changed[1] = True
         warn(f'`/MOTION/BAND/NPROC_REP` ({nproc_rep}) * `/MOTION/BAND/NUMBER_OF_REPLICA` ({number_of_replica}) '
              f'does not correspond to `nnode` or `nprocs`, '
              f'so `tot_num_mpiprocs` is setted as {nproc_rep * number_of_replica}', ResourceWarning)
-
-
-# def check_neb(parameters, machine):
-# warning: if 'NPROC_REP' not set, than it will be setted as tot_num_mpiprocs / number_of_replica
-
-# set default nnode/tot_num_mpiprocs
-# number_of_replica = parameters['MOTION']['BAND']['NUMBER_OF_REPLICA']
-# tot_num_mpiprocs = machine['tot_num_mpiprocs']
-# auto generate nproc_rep
-# nproc_rep = parameters['MOTION']['BAND'].setdefault('NPROC_REP', tot_num_mpiprocs / number_of_replica)
-# if isinstance(nproc_rep, int):
-#     raise ValueError(f'Number of process should be int')
-
-
-def notification_in_dingtalk(webhook, node):
-    headers = {'Content-Type': 'application/json'}
-    title = 'Job Info'
-    text = '## Job Info\n'
-    text += 'Your job is over!\n'
-    text += '>\n'
-    text += f'> Job PK: **{node.pk}**\n'
-    text += '>\n'
-    try:
-        node.called[0].inputs.cp2k__structure.get_formula()
-        text += f'> Job Chemical Formula: **{node.called[0].inputs.cp2k__structure.get_formula()}**\n'
-        text += '>\n'
-    except AttributeError and IndexError:
-        pass
-    text += f'> Job Type: **{node.process_label}**\n'
-    text += '>\n'
-    text += f'> Job State: **{node.process_state.name}**\n'
-    data = {'msgtype': 'markdown', 'markdown': {'title': title, 'text': text}}
-    response = requests.post(url=webhook, headers=headers, data=json.dumps(data))
-    return response
+    return is_changed

@@ -1,34 +1,42 @@
 from abc import ABCMeta, abstractmethod
 
 from aiida.orm import Dict, Code, StructureData
-# from aiida.plugins import WorkflowFactory
 from aiida_cp2k.workchains import Cp2kBaseWorkChain
 from ase import Atoms
 
-from ecint.preprocessor.utils import load_machine, get_procs_per_node_from_code_name, check_neb
+from ecint.preprocessor.utils import load_machine, get_procs_per_node_from_code_name, uniform_neb
 
 
 class Preprocessor(metaclass=ABCMeta):
-    """
-    input: BaseInput(structure) object
-    machine: bsub setting, dict or json file
-    """
 
-    def __init__(self, inputclass, machine=None):
-        self.structure = inputclass.structure
-        self.parameters = Dict(dict=inputclass.input_sets)
-        self.machine = machine
+    def __init__(self, inpclass, restrict_machine=None):
+        """
+        
+        Args:
+            inpclass (ecint.preprocessor.input.BaseInput): input class in ecint.preprocessor.input
+            restrict_machine (dict): restrict machine,
+                            assign which code need be used and how many calculation resources are required
+            
+        """
+        self.structure = inpclass.structure
+        self.parameters = Dict(dict=inpclass.input_sets)
+        self.machine = restrict_machine
 
-    def load_machine(self, machine_config):
-        self.machine = load_machine(machine_config)
+    def load_machine(self, machine):
+        """load general machine to restrict machine
+        """
+        self.machine = load_machine(machine)
 
     @property
     @abstractmethod
     def builder(self):
+        """Set up aiida.engine.WorkChain.get_builder()
+        """
         pass
 
 
-class LSFPreprocessor(Preprocessor):
+class Cp2kPreprocessor(Preprocessor):
+    # TODO: make general Preprocessor for another job scheduler, now just for LSF
     @property
     def builder(self):
         builder = Cp2kBaseWorkChain.get_builder()
@@ -48,14 +56,14 @@ class LSFPreprocessor(Preprocessor):
         return builder
 
 
-class EnergyPreprocessor(LSFPreprocessor):
+class EnergyPreprocessor(Cp2kPreprocessor):
     @property
     def builder(self):
         builder = super(EnergyPreprocessor, self).builder
         return builder
 
 
-class GeooptPreprocessor(LSFPreprocessor):
+class GeooptPreprocessor(Cp2kPreprocessor):
     @property
     def builder(self):
         builder = super(GeooptPreprocessor, self).builder
@@ -63,16 +71,16 @@ class GeooptPreprocessor(LSFPreprocessor):
         return builder
 
 
-class NebPreprocessor(LSFPreprocessor):
+class NebPreprocessor(Cp2kPreprocessor):
     @property
     def builder(self):
         builder = super(NebPreprocessor, self).builder
         builder.cp2k.settings = Dict(dict={'additional_retrieve_list': ["*-pos-Replica_nr_?-1.xyz"]})
-        check_neb(self.parameters.attributes, self.machine)
+        # uniform_neb(self.parameters.attributes, self.machine)
         return builder
 
 
-class FrequencyPreprocessor(LSFPreprocessor):
+class FrequencyPreprocessor(Cp2kPreprocessor):
     @property
     def builder(self):
         builder = super(FrequencyPreprocessor, self).builder

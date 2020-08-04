@@ -1,106 +1,205 @@
 import os
+from abc import ABCMeta, abstractmethod
 from copy import deepcopy
+from warnings import warn
 
 from aiida_cp2k.utils import Cp2kInput
 
-from ecint.preprocessor.kind import *
-from ecint.preprocessor.kind import BaseSets
-from ecint.preprocessor.utils import load_json, update_dict
+from ecint.preprocessor.kind import KindSection, DZVPPBE
+from ecint.preprocessor.utils import update_dict, load_config
 from ecint.workflow.units import CONFIG_DIR
 
 
 class BaseInput(metaclass=ABCMeta):
     @property
     @abstractmethod
+    def structure(self):
+        """
+
+        Returns:
+            aiida.orm.StructureData: structure
+
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def config(self):
+        """
+
+        Returns:
+            dict: base config dict
+
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def kind_section(self):
+        """
+
+        Returns:
+            list[dict]: kind section list of dict,
+                        e.g. [{'_': 'H', 'BASIS_SET': 'TZV2P-MOLOPT-GTH', 'POTENTIAL': 'GTH-PBE'},
+                              {'_': 'O', 'BASIS_SET': 'TZV2P-MOLOPT-GTH', 'POTENTIAL': 'GTH-PBE'}]
+
+        """
+        pass
+
+    @property
+    @abstractmethod
     def input_sets(self):
+        """
+
+        Returns:
+            dict: combine structure, config and kind_section to get input_sets
+
+        """
         pass
 
     @abstractmethod
-    def generate_cp2k_input_file(self):
+    def generate_cp2k_input(self):
+        """
+
+        Returns:
+            str: use input_sets to generate cp2k input
+
+        """
         pass
 
 
-class InputSetsFromFile(BaseInput):
+class InputSets(BaseInput):
+    # TODO: update dict with pbc in xyz, xy, yz, or zx
+    def __init__(self, structure, config, kind_section):
+        """
 
-    def __init__(self, structure, config_path, kind_section_config='DZVPBLYP'):
+        Args:
+            structure (aiida.orm.StructureData): input structure
+            config (dict): input base config
+            kind_section (KindSection or list): elements kind section
+
         """
-        :param structure: atoms or StructureData
-        :param config_path: base sets
-        :param kind_section_config: kind_section sets, use path or TZV2PBLYP or DZVPBLYP DZVPPBE
+        self._structure = structure
+        self._config = config
+        self._kind_section = kind_section
+
+    @property
+    def structure(self):
+        return self._structure
+
+    @property
+    def config(self):
+        return self._config
+
+    def add_config(self, new_dict):
+        """Update new_dict to self.config
         """
-        self.structure = structure
-        self.config = load_json(config_path)
-        # TODO: add check for atoms.cell or atoms.get_volume
-        # define self.kind_section
-        if os.path.exists(kind_section_config):
-            self.kind_section = SetsFromYaml(self.structure, kind_section_config).kind_section
-        elif issubclass(eval(kind_section_config), BaseSets):
-            __KindSectionSets = eval(kind_section_config)
-            self.kind_section = __KindSectionSets(self.structure).kind_section
+        update_dict(self.config, new_dict)
+        return self.config
+
+    @property
+    def kind_section(self):
+        if isinstance(self._kind_section, KindSection):
+            if (self._kind_section.structure is not None) and (self._kind_section.structure != self.structure):
+                warn('You have set structure in KindSection, this structure will be replaced by structure in InputSets',
+                     UserWarning)
+            self._kind_section.load_structure(self.structure)
+            kind_section_list = self._kind_section.kind_section
+        elif isinstance(self._kind_section, list):
+            # evaluate if elements in _kind_section match elements in structure
+            elements_in_kind_duplicate = [one_kind_section["_"] for one_kind_section in self._kind_section]
+            elements_in_kind = set(elements_in_kind_duplicate)
+            if len(elements_in_kind_duplicate) != len(elements_in_kind):
+                raise ValueError('Duplicate elements in kind section')
+            elements_in_structure = self.structure.get_symbols_set()
+            if elements_in_kind == elements_in_structure:
+                kind_section_list = self._kind_section
+            elif elements_in_kind > elements_in_structure:
+                kind_section_list = []
+                for one_kind_section in self._kind_section:
+                    if one_kind_section["_"] in elements_in_structure:
+                        kind_section_list.append(one_kind_section)
+            else:
+                raise ValueError('Elements in kind section does not match elements in structure')
         else:
-            raise ValueError('Unexpected kind_section_config, please input a yaml file or a builtin set')
+            raise TypeError('Input kind_section need be `KindSection` or `dict`')
+        return kind_section_list
+
+    def _update_subsys(self, subsys):
+        """Update subsys section
+        """
+        # add kind section info
+        update_dict(subsys, {"KIND": self.kind_section})
+        # add structure cell info
+        for i, letter in enumerate('ABC'):
+            update_dict(subsys, {"CELL": {letter: '{:<15} {:<15} {:<15}'.format(*self.structure.cell[i])}})
+        # # add structure coordinate info
+        # atoms = self.structure.get_ase()
+        # tags = np.char.array(['' if tag == 0 else str(tag) for tag in atoms.get_tags()])
+        # symbols = np.char.array([symbol.ljust(2) for symbol in atoms.get_chemical_symbols()]) + tags
+        # positions = np.char.array(['{:20.10f} {:20.10f} {:20.10f}'.format(p[0], p[1], p[2])
+        #                            for p in atoms.get_positions()])
+        # coords = symbols + positions
+        # update_dict(subsys, {"COORD": {"": coords.tolist()}})
 
     @property
     def input_sets(self):
-        _config = deepcopy(self.config)
-        force_eval = _config["FORCE_EVAL"]
+        _input_sets = deepcopy(self.config)
+        force_eval = _input_sets["FORCE_EVAL"]
+        # update FORCE_EVAL or MULTI_FORCE_EVAL
         if isinstance(force_eval, dict):
-            force_eval["SUBSYS"]["KIND"] = self.kind_section
+            self._update_subsys(force_eval.setdefault("SUBSYS", {}))
         elif isinstance(force_eval, list):
             for one_force_eval in force_eval:
-                one_force_eval["SUBSYS"]["KIND"] = self.kind_section
+                self._update_subsys(one_force_eval.setdufault("SUBSYS", {}))
         else:
-            raise ValueError('FORCE_EVAL section should be dict or list')
-        return _config
+            raise TypeError('FORCE_EVAL section should be dict or list')
+        return _input_sets
 
-    def add_config(self, new_config):
+    def generate_cp2k_input(self):
+        """Generate input_sets to cp2k input
         """
-        :param new_config: like {'MOTION':{'BAND':{'NPROC_REP':24}}}
-        """
-        update_dict(self.config, new_config)
-
-    def generate_cp2k_input_file(self):
-        from aiida_cp2k.calculations import Cp2kCalculation
         inp = Cp2kInput(self.input_sets)
-        for i, letter in enumerate('ABC'):
-            # atoms or StructureData has the same property `cell`
-            inp.add_keyword('FORCE_EVAL/SUBSYS/CELL/' + letter, '{:<15} {:<15} {:<15}'.format(*self.structure.cell[i]),
-                            override=False, conflicting_keys=['ABC', 'ALPHA_BETA_GAMMA', 'CELL_FILE_NAME'])
-            topo = "FORCE_EVAL/SUBSYS/TOPOLOGY"
-            inp.add_keyword(topo + "/COORD_FILE_NAME", Cp2kCalculation._DEFAULT_COORDS_FILE_NAME, override=False)
-            inp.add_keyword(topo + "/COORD_FILE_FORMAT", "XYZ", override=False, conflicting_keys=['COORDINATE'])
         return inp.render()
 
 
-# maybe unneeded
-# class InputSetsWithDefaultConfig(InputSetsFromFile):
-#
-#    def __init__(self, structure, config, kind_section_config):
-#        """
-#        :param structure
-#        :param config
-#        :param kind_section_config: kind_section_config_path or TZV2PBLYP or DZVPBLYP DZVPPBE
-#        """
-#        config_path = os.path.join(CONFIG_DIR, config)
-#        super(InputSetsWithDefaultConfig, self).__init__(structure, config_path=config_path,
-#                                                         kind_section_config=kind_section_config)
+class UnitsInputSets(InputSets):
+    """
+
+    Args:
+        structure (aiida.orm.StructureData): input structure
+        config (str or dict): input base config file path
+        kind_section (KindSection or list): elements kind section
+
+    """
+
+    @property
+    def config(self):
+        if isinstance(self._config, str):
+            units_config_path = os.path.join(CONFIG_DIR, self._config)
+            units_config = load_config(units_config_path)
+        elif isinstance(self._config, dict):
+            units_config = self._config
+        else:
+            raise TypeError(f'Units config should use config file under {CONFIG_DIR}')
+        return units_config
 
 
-class EnergyInputSets(InputSetsFromFile):
-    def __init__(self, structure, config=os.path.join(CONFIG_DIR, 'energy.json'), kind_section_config='DZVPBLYP'):
-        super(EnergyInputSets, self).__init__(structure, config, kind_section_config)
+class EnergyInputSets(UnitsInputSets):
+    def __init__(self, structure, config='energy.json', kind_section=DZVPPBE()):
+        super(EnergyInputSets, self).__init__(structure, config, kind_section)
 
 
-class GeooptInputSets(InputSetsFromFile):
-    def __init__(self, structure, config=os.path.join(CONFIG_DIR, 'geoopt.json'), kind_section_config='DZVPBLYP'):
-        super(GeooptInputSets, self).__init__(structure, config, kind_section_config)
+class GeooptInputSets(UnitsInputSets):
+    def __init__(self, structure, config='geoopt.json', kind_section=DZVPPBE()):
+        super(GeooptInputSets, self).__init__(structure, config, kind_section)
 
 
-class NebInputSets(InputSetsFromFile):
-    def __init__(self, structure, config=os.path.join(CONFIG_DIR, 'neb.json'), kind_section_config='DZVPBLYP'):
-        super(NebInputSets, self).__init__(structure, config, kind_section_config)
+class NebInputSets(UnitsInputSets):
+    def __init__(self, structure, config='neb.json', kind_section=DZVPPBE()):
+        super(NebInputSets, self).__init__(structure, config, kind_section)
 
 
-class FrequencyInputSets(InputSetsFromFile):
-    def __init__(self, structure, config=os.path.join(CONFIG_DIR, 'frequency.json'), kind_section_config='DZVPBLYP'):
-        super(FrequencyInputSets, self).__init__(structure, config, kind_section_config)
+class FrequencyInputSets(UnitsInputSets):
+    def __init__(self, structure, config='frequency.json', kind_section=DZVPPBE()):
+        super(FrequencyInputSets, self).__init__(structure, config, kind_section)
