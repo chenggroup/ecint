@@ -1,3 +1,4 @@
+import importlib
 import os
 from dataclasses import dataclass, field, asdict
 from warnings import warn
@@ -11,8 +12,7 @@ from tqdm import tqdm
 from ecint.config import RESULT_NAME
 from ecint.postprocessor.utils import notification_in_dingtalk
 from ecint.preprocessor.kind import KindSection
-from ecint.preprocessor.utils import load_json, load_yaml, \
-    load_config, load_structure, load_kind, load_machine
+from ecint.preprocessor.utils import load_json, load_yaml, load_config, load_structure, load_kind, load_machine
 
 load_profile()
 
@@ -61,15 +61,30 @@ class UserInput(object):
         return workflow_inp
 
 
-def _load_subdata(user_input):
+def load_workflow(workflow_name):
+    """Convert warkflow name to WorkChain Process
+
+    Args:
+        workflow_name (str): name of user input workflow
+
+    Returns:
+        WorkChain: workflow in ecint
+
+    """
+    workflow_lib = importlib.import_module('ecint.workflow')
+    workflow = getattr(workflow_lib, workflow_name)
+    return workflow
+
+
+def _load_subdata(subdata):
     workflow_inp = {}
     # check config
-    if user_input.get('config'):
-        config = user_input.pop('config')
+    if subdata.get('config'):
+        config = subdata.pop('config')
         workflow_inp.update({'config': load_config(config)})
     # check kind_section
-    if user_input.get('kind_section'):
-        kind_section = user_input.pop('kind_section')
+    if subdata.get('kind_section'):
+        kind_section = subdata.pop('kind_section')
         if isinstance(kind_section, dict) and ('BASIS_SET' in kind_section) and ('POTENTIAL' in kind_section):
             _kind_section = KindSection(kind_section['BASIS_SET'], kind_section['POTENTIAL'])
             workflow_inp.update({'kind_section': _kind_section})
@@ -78,19 +93,19 @@ def _load_subdata(user_input):
         else:
             workflow_inp.update({'kind_section': load_kind(kind_section)})
     # check machine
-    if user_input.get('machine'):
-        machine = user_input.pop('machine')
+    if subdata.get('machine'):
+        machine = subdata.pop('machine')
         workflow_inp.update({'machine': load_machine(machine)})
     return workflow_inp
 
 
-def _load_metadata(user_input):
-    return {**_load_subdata(user_input)}, {**user_input}
+def _load_metadata(metadata):
+    return {**_load_subdata(metadata)}, {**metadata}
 
 
 def load_input(user_input, resdir):
     workflow_inp = {}
-    workflow = eval(user_input.get('workflow'))
+    workflow = load_workflow(user_input.get('workflow'))
     # check resdir
     # resdir = os.path.abspath(userinput.pop('resdir'))
     if os.path.isdir(resdir):
@@ -167,7 +182,7 @@ class Ecint(WorkChain):
         return True if self.inputs.get('webhook') else False
 
     def submit_workchain(self):
-        node = self.submit(eval(self.inputs.workflow), **self.inputs.workflow_inp)
+        node = self.submit(load_workflow(self.inputs.workflow), **self.inputs.workflow_inp)
         self.to_context(workchain=node)
 
     def inspect_workchain(self):
