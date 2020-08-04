@@ -135,9 +135,6 @@
       "STRESS_TENSOR": {
         "_": ""
       }
-    },
-    "SUBSYS": {
-      "KIND": []
     }
   }
 }

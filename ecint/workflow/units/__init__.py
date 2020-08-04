@@ -1,18 +1,18 @@
 import os
 
 from aiida.engine import run
-from aiida.orm import Dict, StructureData, Code
+from aiida.orm import Dict, Code
 from aiida_cp2k.calculations import Cp2kCalculation
 
-from ecint.preprocessor.utils import load_json, load_machine, check_neb
+from ecint.preprocessor.utils import load_json, load_machine
 
 CONFIG_DIR = os.path.dirname(os.path.abspath(__file__))
 
 
 class JsonDryRun(object):
-    def __init__(self, inputclass, machine=None):
-        self.structure = StructureData(ase=inputclass.structure)
-        self.parameters = Dict(dict=inputclass.input_sets)
+    def __init__(self, inputsets, machine=None):
+        self.structure = inputsets.structure
+        self.parameters = Dict(dict=inputsets.input_sets)
         self.machine = machine or self.default_machine
 
     @property
@@ -22,7 +22,7 @@ class JsonDryRun(object):
             'W': 20 * 60,
             'q': 'large',
             'ptile': 24,
-            'code@computer': 'cp2k@chenglab51',
+            'code@computer': 'cp2k@aiida_test',
         }
         return load_machine(machine)
 
@@ -41,7 +41,7 @@ class JsonDryRun(object):
         builder.metadata.options.custom_scheduler_commands = self.machine['custom_scheduler_commands']
 
         builder.metadata.dry_run = True
-        check_neb(self.parameters.attributes, self.machine)
+        # uniform_neb(self.parameters.attributes, self.machine)
         return builder
 
     def run(self):

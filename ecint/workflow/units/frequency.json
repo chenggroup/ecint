@@ -44,9 +44,6 @@
           }
         }
       }
-    },
-    "SUBSYS": {
-      "KIND": []
     }
   },
   "VIBRATIONAL_ANALYSIS": {

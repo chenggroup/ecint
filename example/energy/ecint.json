@@ -1,0 +1,22 @@
+{
+  "workflow": "EnergySingleWorkChain",
+  "webhook": "https://oapi.dingtalk.com/robot/send?access_token=xxx",
+  "resdir": "results_json",
+  "structure": "Cu13CO.vasp",
+  "metadata": {
+    "kind_section": {
+      "C": {
+        "BASIS_SET": "TZV2P-MOLOPT-GTH",
+        "POTENTIAL": "GTH-PBE"
+      },
+      "O": {
+        "BASIS_SET": "TZV2P-MOLOPT-GTH",
+        "POTENTIAL": "GTH-PBE"
+      },
+      "Cu": {
+        "BASIS_SET": "DZVP-MOLOPT-SR-GTH",
+        "POTENTIAL": "GTH-PBE"
+      }
+    }
+  }
+}

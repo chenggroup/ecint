@@ -1,0 +1,19 @@
+workflow: GeooptSingleWorkChain
+webhook: https://oapi.dingtalk.com/robot/send?access_token=xxx
+resdir: results_yaml
+structure: fs.xyz
+cell:
+  - 10.239521
+  - 11.352600
+  - 27.891432
+metadata:
+  kind_section:
+    H:
+      BASIS_SET: DZVP-MOLOPT-SR-GTH
+      POTENTIAL: GTH-PBE-q1
+    O:
+      BASIS_SET: DZVP-MOLOPT-SR-GTH
+      POTENTIAL: GTH-PBE-q6
+    Ti:
+      BASIS_SET: DZVP-MOLOPT-SR-GTH
+      POTENTIAL: GTH-PBE-q12

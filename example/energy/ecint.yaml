@@ -1,0 +1,8 @@
+workflow: EnergySingleWorkChain
+webhook: https://oapi.dingtalk.com/robot/send?access_token=xxx
+resdir: results_yaml
+structure: Cu13CO.vasp
+metadata:
+  kind_section:
+    BASIS_SET: DZVP-MOLOPT-SR-GTH
+    POTENTIAL: GTH-PBE
