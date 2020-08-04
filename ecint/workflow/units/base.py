@@ -69,6 +69,7 @@ class EnergySingleWorkChain(BaseSingleWorkChain):
     @classmethod
     def define(cls, spec):
         super(EnergySingleWorkChain, cls).define(spec)
+        spec.input('label', default='coords', valid_type=str, required=False, non_db=True)
         spec.input('structure', valid_type=StructureData, required=True)
         spec.input('config', default=load_default_config('energy.json'),
                    valid_type=dict, required=False, non_db=True)
@@ -102,6 +103,12 @@ class EnergySingleWorkChain(BaseSingleWorkChain):
 
     def write_results(self):
         os.chdir(self.inputs.resdir)
+        # write structure with energy
+        output_structure_name = f'{self.inputs.label}.xyz'
+        atoms = self.inputs.structure.get_ase()
+        atoms.info.update({'E': f'{self.ctx.energy} eV'})
+        atoms.write(output_structure_name)
+
         with open(RESULT_NAME, 'a') as f:
             f.write(f'# Step: Energy, PK: {self.ctx.energy_workchain.pk}\n')
             f.write(f'energy (eV): {self.ctx.energy}\n')
@@ -139,9 +146,11 @@ class GeooptSingleWorkChain(BaseSingleWorkChain):
         inspect_node(self.ctx.geoopt_workchain)
 
     def get_structure_geoopt(self):
-        node = self.ctx.geoopt_workchain
-        with node.outputs.retrieved.open(f'aiida-pos-1.xyz') as traj_file:
-            geoopt_atoms = get_last_frame(traj_file, cell=self.inputs.structure.cell, pbc=self.inputs.structure.pbc)
+        retrieved = self.ctx.geoopt_workchain.outputs.retrieved
+        traj_pattern = re.compile(r'.*-pos-1.xyz')
+        traj_file = next(filter(lambda x: re.match(traj_pattern, x), retrieved.list_object_names()))
+        with retrieved.open(traj_file) as f:
+            geoopt_atoms = get_last_frame(f, cell=self.inputs.structure.cell, pbc=self.inputs.structure.pbc)
         self.ctx.structure_geoopt = StructureData(ase=geoopt_atoms)
         energy = self.ctx.geoopt_workchain.outputs.output_parameters.get_attribute('energy') * AU2EV
         self.ctx.structure_geoopt.set_attribute('energy', energy)
@@ -212,16 +221,15 @@ class NebSingleWorkChain(BaseSingleWorkChain):
         inspect_node(self.ctx.neb_workchain)
 
     def get_energy_curve_data(self):
-        node = self.ctx.neb_workchain
+        retrieved = self.ctx.neb_workchain.outputs.retrieved
         # get list of `Atoms`
         replica_pattern = re.compile(r'.*-pos-Replica_nr_(\d+)-1.xyz')
-        replica_file_list = sorted(
-            filter(lambda x: re.match(replica_pattern, x), node.outputs.retrieved.list_object_names()),
-            key=lambda x: int(re.match(replica_pattern, x).group(1)))
+        replica_file_list = sorted(filter(lambda x: re.match(replica_pattern, x), retrieved.list_object_names()),
+                                   key=lambda x: int(re.match(replica_pattern, x).group(1)))
         replica_traj = []
         energy_list = []
         for replica_file in replica_file_list:
-            with node.outputs.retrieved.open(replica_file) as f:
+            with retrieved.open(replica_file) as f:
                 replica_atoms = get_last_frame(f, cell=self.ctx.cell, pbc=self.ctx.pbc)
                 energy = replica_atoms.info['E'] * AU2EV
                 replica = StructureData(ase=replica_atoms)
