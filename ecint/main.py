@@ -47,8 +47,11 @@ class UserInput(object):
         if self.has_structures_folder:
             workflow_inp = []
             if os.path.isdir(self.structures_folder):
-                for i, structure_file in enumerate(tqdm(os.listdir(self.structures_folder))):
+                print('Convert Structures...')
+                structure_bar = tqdm(os.listdir(self.structures_folder))
+                for i, structure_file in enumerate(structure_bar):
                     try:
+                        structure_bar.set_description(f'Upload {structure_file}')
                         structure_dir = os.path.join(self.structures_folder, structure_file)
                         workflow_inp.append({'structure': load_structure(structure_dir, self.cell, self.pbc),
                                              **load_input(asdict(self), resdir=os.path.join(self.resdir, str(i)))})
@@ -108,7 +111,7 @@ def load_input(user_input, resdir):
     workflow = load_workflow(user_input.get('workflow'))
     # check resdir
     # resdir = os.path.abspath(userinput.pop('resdir'))
-    if os.path.isdir(resdir):
+    if isinstance(resdir, str):
         if hasattr(workflow, 'SUB'):
             for submeta in workflow.SUB:
                 workflow_inp.update({submeta: {'resdir': os.path.abspath(resdir)}})
@@ -132,7 +135,7 @@ def load_input(user_input, resdir):
             if submeta not in workflow.SUB:
                 raise KeyError(f'Unknown {submeta} in {user_input.get("workflow")}')
             else:
-                workflow_inp[submeta].update(_load_subdata(subinfo))
+                workflow_inp[submeta].update(**_load_subdata(subinfo))
     # check structure
     # workflow_inp.update(load_s(userinput))
     return workflow_inp
@@ -210,12 +213,13 @@ def _submit_ecint(resdir, webhook, workflow, workflow_inp):
     """
 
     Args:
-        resdir ():
-        webhook ():
-        workflow ():
-        workflow_inp ():
+        resdir (str): results directory for workflow
+        webhook (str): webhook for notification
+        workflow (str): workflow name
+        workflow_inp (dict): workflow input, e.g. {'structure':, 'resdir':, 'config':, 'kind_section':, 'machine':}
 
     Returns:
+        None
 
     """
     # before submit, check resdir
@@ -250,10 +254,6 @@ def submit_from_file(input_file):
     # check webhook
     webhook = userinput.webhook
     check_webhook(webhook)
-    # check resdir and make it if not exists
-    if not os.path.exists(userinput.resdir):
-        print(f'{userinput.resdir} not exist, so auto make it')
-        os.mkdir(userinput.resdir)
     # submit...
     workflow = userinput.workflow
     workflow_inp = userinput.get_workflow_inp()
@@ -265,7 +265,7 @@ def submit_from_file(input_file):
                       workflow_inp=workflow_inp)
         print('END SUBMIT')
     elif isinstance(workflow_inp, list):
-        print('START SUBMIT MULTI STRUCTURES')
+        print('START SUBMIT MULTI STRUCTURES...')
         for i, one_workflow_inp in enumerate(tqdm(workflow_inp)):
             _submit_ecint(resdir=os.path.join(userinput.resdir, str(i)),
                           webhook=webhook,
