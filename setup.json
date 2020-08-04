@@ -30,7 +30,12 @@
       "ecrun=ecint.main:main"
     ],
     "aiida.workflows": [
-      "ecint.neb = ecint.workflow:NebWorkChain"
+      "ecint.ecint = ecint.main:Ecint",
+      "ecint.neb = ecint.workflow:NebWorkChain",
+      "ecint.energy_s = ecint.workflow:EnergySingleWorkChain",
+      "ecint.geoopt_s = ecint.workflow:GeooptSingleWorkChain",
+      "ecint.neb_s = ecint.workflow:NebSingleWorkChain",
+      "ecint.frequency_s = ecint.workflow:FrequencySingleWorkChain"
     ]
   },
   "setup_requires": [
