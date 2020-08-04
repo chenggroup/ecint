@@ -1,3 +1,6 @@
+from collections import Counter
+
+import matplotlib.pyplot as plt
 from aiida.orm import load_node
 from aiida.tools.visualization import Graph
 
@@ -64,3 +67,15 @@ def get_provenance_graph(pk, level, annotate_links=None, graph_attr=None):
             annotate_links=annotate_links,
         )
     graph.graphviz.render(f'provenance_graph_{level}', format='png')
+
+
+def plot_energy_curve(trajectory, output_file='potential_energy_curve.png'):
+    fig, ax = plt.subplots(figsize=[8, 6])
+    chemical_formula = ''.join([f'{symbol}_{{{num}}}' for symbol, num in Counter(trajectory.symbols).items()])
+    ax.set_title(f'Potential Energy Curve for ${chemical_formula}$', fontsize=20)
+    ax.set_xlabel('Images', fontsize=18)
+    ax.set_ylabel('Potential Energy (eV)', fontsize=18)
+    energy = trajectory.get_array('energy')
+    ax.plot(range(len(energy)), energy)
+    fig.tight_layout()
+    fig.savefig(output_file)
