@@ -1,3 +1,10 @@
+# MacOS
+.DS_Store
+
+# workflow output
+results_json/
+results_yaml/
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
