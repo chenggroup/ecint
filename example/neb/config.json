@@ -1,0 +1,55 @@
+{
+  "MOTION": {
+    "BAND": {
+      "BAND_TYPE": "CI-NEB",
+      "NUMBER_OF_REPLICA": 6,
+      "K_SPRING": 0.05,
+      "CONVERGENCE_CONTROL": {
+        "MAX_FORCE": 0.0030,
+        "RMS_FORCE": 0.0050,
+        "MAX_DR": 0.002,
+        "RMS_DR": 0.005
+      },
+      "ROTATE_FRAMES": "F",
+      "ALIGN_FRAMES": "F",
+      "CI_NEB": {
+        "NSTEPS_IT": 2
+      },
+      "OPTIMIZE_BAND": {
+        "OPT_TYPE": "DIIS",
+        "DIIS": {
+          "MAX_STEPS": 1000,
+          "N_DIIS": 3,
+          "NO_LS": ""
+        }
+      },
+      "REPLICA": []
+    }
+  },
+  "FORCE_EVAL": {
+    "METHOD": "Quickstep",
+    "DFT": {
+      "BASIS_SET_FILE_NAME": "BASIS_MOLOPT",
+      "POTENTIAL_FILE_NAME": "GTH_POTENTIALS",
+      "MULTIPLICITY": 1,
+      "MGRID": {
+        "CUTOFF": 400
+      },
+      "QS": {
+        "EPS_DEFAULT": 1e-13,
+        "EXTRAPOLATION": "ASPC",
+        "EXTRAPOLATION_ORDER": 2
+      },
+      "SCF": {
+        "SCF_GUESS": "RESTART",
+        "EPS_SCF": 1e-6,
+        "MAX_SCF": 300
+      },
+      "XC": {
+        "XC_FUNCTIONAL": {
+          "_": "PBE"
+        }
+      }
+    }
+  }
+}

@@ -1,13 +1,13 @@
 workflow: NebSingleWorkChain
-webhook: https://oapi.dingtalk.com/robot/send?access_token=xxx
-resdir: results_yaml
+#webhook: https://oapi.dingtalk.com/robot/send?access_token=xxx
+resdir: results
 structure:
   - is.xyz
   - fs.xyz
 cell:
-  - [10.239521, 0, 0]
-  - [0, 11.352600, 0]
-  - [0, 0, 27.891432]
+  - [ 10, 0, 0 ]
+  - [ 0, 10, 0 ]
+  - [ 0, 0, 20 ]
 metadata:
   kind_section:
     BASIS_SET: DZVP-MOLOPT-SR-GTH

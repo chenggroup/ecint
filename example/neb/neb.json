@@ -7,11 +7,17 @@
     "fs.xyz"
   ],
   "cell": [
-    10.239521,
-    11.352600,
-    27.891432
+    10,
+    10,
+    20
   ],
   "metadata": {
+    "config": "config.json",
+    "machine": {
+      "code@computer": "cp2k@aiida_test_res",
+      "nnode": 4,
+      "queue": "large"
+    },
     "kind_section": {
       "BASIS_SET": "DZVP-MOLOPT-SR-GTH",
       "POTENTIAL": "GTH-PBE"

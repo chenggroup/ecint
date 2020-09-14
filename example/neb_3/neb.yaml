@@ -2,20 +2,26 @@ workflow: NebWorkChain
 webhook: https://oapi.dingtalk.com/robot/send?access_token=xxx
 resdir: results_yaml
 structure:
-  - ethane_1_opt.xyz
+  - ethane_1.xyz
   - ethane_s1.xyz
   - ethane_ts.xyz
-  - ethane_s2.xyz
+  - ethane_2.xyz
 cell:
   - [12, 0, 0]
   - [0, 12, 0]
   - [0, 0, 12]
 metadata:
+  machine:
+    code@computer: cp2k@aiida_test_res
+    nnode: 2
+    queue: medium
   kind_section:
     BASIS_SET: DZVP-MOLOPT-SR-GTH
     POTENTIAL: GTH-PBE
 subdata:
   geoopt:
-    kind_section:
-      BASIS_SET: TZV2P-MOLOPT-GTH
-      POTENTIAL: GTH-PBE
+    config: geoopt_config.yaml
+  neb:
+    config: neb_config.yaml
+  frequency:
+    config: freq_config.yaml
