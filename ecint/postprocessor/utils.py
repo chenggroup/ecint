@@ -6,7 +6,9 @@ import requests
 from ase import Atoms
 from ase.io import read, write
 
-AU2EV = 27.211399
+from ecint.postprocessor.parse import parse_band_convergence_like_info
+
+AU2EV = 27.2113838565563
 
 PROJECT_NAME = 'aiida'
 TRAJ_NAME = f'{PROJECT_NAME}-pos-1.xyz'
@@ -96,13 +98,6 @@ def write_xyz_from_trajectory(trajectory, output_file):
     write(output_file, traj)
 
 
-def parse_band_convergence_like_info(str_info):
-    band_convergence_like_info_dict = {'step_value': float(re.search(r'=(.*)\[', str_info).group(1)),
-                                       'convergence_criteria': float(re.search(r'\[(.*)\]', str_info).group(1)),
-                                       'is_converged': re.search(r'(YES|NO)', str_info).group(0)}
-    return band_convergence_like_info_dict
-
-
 def notification_in_dingtalk(webhook, node):
     """Send messages to dingtalk
 
@@ -131,3 +126,28 @@ def notification_in_dingtalk(webhook, node):
     data = {'msgtype': 'markdown', 'markdown': {'title': title, 'text': text}}
     response = requests.post(url=webhook, headers=headers, data=json.dumps(data))
     return response
+
+
+def get_convergence_info_of_band(band_file):
+    """
+    check if BAND.out is convergent
+    :param band_file:
+    :return:
+    """
+    with open(band_file) as f:
+        band_info = f.read()
+    rms_displacement = re.findall(r'RMS DISPLACEMENT.*', band_info)
+    max_displacement = re.findall(r'MAX DISPLACEMENT', band_info)
+    rms_force = re.findall(r'RMS FORCE', band_info)
+    max_force = re.findall(r'MAX FORCE', band_info)
+
+    def get_convergence_info_list(convergence_key):
+        return [parse_band_convergence_like_info(info) for info in convergence_key]
+
+    band_convergence_info = {
+        'rms_displacement': get_convergence_info_list(rms_displacement),
+        'max_displacement': get_convergence_info_list(max_displacement),
+        'rms_force': get_convergence_info_list(rms_force),
+        'max_force': get_convergence_info_list(max_force)
+    }
+    return band_convergence_info
