@@ -60,6 +60,7 @@ class EnergyPreprocessor(Cp2kPreprocessor):
     @property
     def builder(self):
         builder = super(EnergyPreprocessor, self).builder
+        builder.cp2k.settings = Dict(dict={'additional_retrieve_list': ["*.cube", "*.pdos"]})
         return builder
 
 
