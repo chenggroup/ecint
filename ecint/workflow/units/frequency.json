@@ -1,8 +1,4 @@
 {
-  "GLOBAL": {
-    "RUN_TYPE": "VIBRATIONAL_ANALYSIS",
-    "PRINT_LEVEL": "MEDIUM"
-  },
   "FORCE_EVAL": {
     "METHOD": "Quickstep",
     "DFT": {

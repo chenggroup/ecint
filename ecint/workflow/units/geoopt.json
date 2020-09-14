@@ -1,28 +1,9 @@
 {
-  "GLOBAL": {
-    "RUN_TYPE": "GEO_OPT",
-    "PRINT_LEVEL": "medium"
-  },
   "MOTION": {
     "GEO_OPT": {
       "TYPE": "minimization",
       "OPTIMIZER": "BFGS",
       "MAX_ITER": 200
-    },
-    "MD": {
-      "THERMOSTAT": {
-        "NOSE": {
-          "LENGTH": 3,
-          "YOSHIDA": 3,
-          "TIMECON": 1000,
-          "MTS": 2
-        }
-      },
-      "ENSEMBLE": "NVT",
-      "STEPS": 2000000,
-      "TIMESTEP": 0.5,
-      "TEMPERATURE": 330.0,
-      "TEMP_TOL": 50
     },
     "PRINT": {
       "TRAJECTORY": {

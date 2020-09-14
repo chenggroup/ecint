@@ -79,6 +79,7 @@ class InputSets(BaseInput):
             kind_section (KindSection or list): elements kind section
 
         """
+        self.check_global(config)
         self._structure = structure
         self._config = config
         self._kind_section = kind_section
@@ -133,6 +134,9 @@ class InputSets(BaseInput):
         # add structure cell info
         for i, letter in enumerate('ABC'):
             update_dict(subsys, {"CELL": {letter: '{:<15} {:<15} {:<15}'.format(*self.structure.cell[i])}})
+        # TODO: add more pbc function, like treating with (False, False, True)
+        if self.structure.pbc == (False, False, False):
+            update_dict(subsys, {"CELL": {"PERIODIC": "NONE"}})
         # # add structure coordinate info
         # atoms = self.structure.get_ase()
         # tags = np.char.array(['' if tag == 0 else str(tag) for tag in atoms.get_tags()])
@@ -141,6 +145,11 @@ class InputSets(BaseInput):
         #                            for p in atoms.get_positions()])
         # coords = symbols + positions
         # update_dict(subsys, {"COORD": {"": coords.tolist()}})
+
+    @classmethod
+    def check_global(cls, config):
+        if config.get('GLOBAL'):
+            raise ValueError('You can not set `GLOBAL` section for a specific workflow')
 
     @property
     def input_sets(self):
@@ -188,18 +197,22 @@ class UnitsInputSets(InputSets):
 class EnergyInputSets(UnitsInputSets):
     def __init__(self, structure, config='energy.json', kind_section=DZVPPBE()):
         super(EnergyInputSets, self).__init__(structure, config, kind_section)
+        self.add_config({"GLOBAL": {"RUN_TYPE": "ENERGY", "PRINT_LEVEL": "MEDIUM"}})
 
 
 class GeooptInputSets(UnitsInputSets):
     def __init__(self, structure, config='geoopt.json', kind_section=DZVPPBE()):
         super(GeooptInputSets, self).__init__(structure, config, kind_section)
+        self.add_config({"GLOBAL": {"RUN_TYPE": "GEO_OPT", "PRINT_LEVEL": "MEDIUM"}})
 
 
 class NebInputSets(UnitsInputSets):
     def __init__(self, structure, config='neb.json', kind_section=DZVPPBE()):
         super(NebInputSets, self).__init__(structure, config, kind_section)
+        self.add_config({"GLOBAL": {"RUN_TYPE": "BAND", "PRINT_LEVEL": "MEDIUM"}})
 
 
 class FrequencyInputSets(UnitsInputSets):
     def __init__(self, structure, config='frequency.json', kind_section=DZVPPBE()):
         super(FrequencyInputSets, self).__init__(structure, config, kind_section)
+        self.add_config({"GLOBAL": {"RUN_TYPE": "VIBRATIONAL_ANALYSIS", "PRINT_LEVEL": "MEDIUM"}})

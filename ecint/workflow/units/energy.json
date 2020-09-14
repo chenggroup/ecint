@@ -1,7 +1,4 @@
 {
-  "GLOBAL": {
-    "RUN_TYPE": "ENERGY"
-  },
   "FORCE_EVAL": {
     "METHOD": "Quickstep",
     "DFT": {

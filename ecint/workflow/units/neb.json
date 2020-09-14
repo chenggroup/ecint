@@ -1,7 +1,4 @@
 {
-  "GLOBAL": {
-    "RUN_TYPE": "BAND"
-  },
   "MOTION": {
     "BAND": {
       "BAND_TYPE": "CI-NEB",
