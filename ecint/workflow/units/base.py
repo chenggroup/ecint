@@ -147,8 +147,8 @@ class GeooptSingleWorkChain(BaseSingleWorkChain):
 
     def get_structure_geoopt(self):
         retrieved = self.ctx.geoopt_workchain.outputs.retrieved
-        traj_pattern = re.compile(r'.*-pos-1.xyz')
-        traj_file = next(filter(lambda x: re.match(traj_pattern, x), retrieved.list_object_names()))
+        traj_regex = re.compile(r'.*-pos-1.xyz')
+        traj_file = next(filter(lambda x: traj_regex.match(x), retrieved.list_object_names()))
         with retrieved.open(traj_file) as f:
             geoopt_atoms = get_last_frame(f, cell=self.inputs.structure.cell, pbc=self.inputs.structure.pbc)
         self.ctx.structure_geoopt = StructureData(ase=geoopt_atoms)
@@ -223,9 +223,9 @@ class NebSingleWorkChain(BaseSingleWorkChain):
     def get_energy_curve_data(self):
         retrieved = self.ctx.neb_workchain.outputs.retrieved
         # get list of `Atoms`
-        replica_pattern = re.compile(r'.*-pos-Replica_nr_(\d+)-1.xyz')
-        replica_file_list = sorted(filter(lambda x: re.match(replica_pattern, x), retrieved.list_object_names()),
-                                   key=lambda x: int(re.match(replica_pattern, x).group(1)))
+        replica_regex = re.compile(r'.*-pos-Replica_nr_(\d+)-1.xyz')
+        replica_file_list = sorted(filter(lambda x: replica_regex.match(x), retrieved.list_object_names()),
+                                   key=lambda x: int(replica_regex.match(x).group(1)))
         replica_traj = []
         energy_list = []
         for replica_file in replica_file_list:
@@ -254,7 +254,7 @@ class NebSingleWorkChain(BaseSingleWorkChain):
         output_traj_name = 'images_traj.xyz'
         write_xyz_from_trajectory(self.ctx.traj_for_energy_curve, output_file=output_traj_name)
         # plot potential energy curve with data in traj_for_energy_curve
-        output_energy_curve_name = 'potential_energy_curve.png'
+        output_energy_curve_name = 'potential_energy_path.png'
         plot_energy_curve(self.ctx.traj_for_energy_curve, output_file=output_energy_curve_name)
         # write transition state structure
         output_ts_name = 'transition_state.xyz'
