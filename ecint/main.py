@@ -91,8 +91,6 @@ def _load_subdata(subdata):
         if isinstance(kind_section, dict) and ('BASIS_SET' in kind_section) and ('POTENTIAL' in kind_section):
             _kind_section = KindSection(kind_section['BASIS_SET'], kind_section['POTENTIAL'])
             workflow_inp.update({'kind_section': _kind_section})
-        elif isinstance(kind_section, dict) and set(kind_section) != {'BASIS_SET', 'POTENTIAL'}:
-            raise ValueError('If you setup `kind_setion`, you need set both `BASIS_SET` and `POTENTIAL`')
         else:
             workflow_inp.update({'kind_section': load_kind(kind_section)})
     # check machine
@@ -165,13 +163,21 @@ def load_s(user_input):
     return workflow_inp
 
 
+# def check_dict(mapping):
+#     """Purpose for undoing aiida default serializer, to avoid OrderedDict Error"""
+#     if isinstance(mapping, dict):
+#         return mapping
+#     else:
+#         return "Unrecognized dictionary"
+
+
 class Ecint(WorkChain):
     @classmethod
     def define(cls, spec):
         super(Ecint, cls).define(spec)
         spec.input('webhook', valid_type=(str, type(None)), required=False, non_db=True)
         spec.input('workflow', valid_type=str, required=True, non_db=True)
-        spec.input('workflow_inp', valid_type=dict, required=True, non_db=True)
+        spec.input('workflow_inp', valid_type=dict, required=False, non_db=True)
 
         spec.outline(
             cls.submit_workchain,
@@ -276,6 +282,6 @@ def submit_from_file(input_file):
 
 
 @click.command()
-@click.argument('input_file', type=click.Path(exists=True), default='neb.json')
-def main(input_file):
-    submit_from_file(input_file)
+@click.argument('filename', type=click.Path(exists=True), default='ecint.json')
+def main(filename):
+    submit_from_file(filename)

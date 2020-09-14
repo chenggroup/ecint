@@ -6,6 +6,7 @@ _E_WITH_Q = {'H': '1', 'He': '2', 'Li': '3', 'Be': '4', 'B': '3', 'C': '4', 'N':
              'Pd': '18', 'Ag': '11', 'Cd': '12', 'In': '3', 'Sn': '4', 'Sb': '5', 'Te': '6', 'I': '7', 'Xe': '8',
              'Cs': '9', 'Ba': '10', 'La': '11', 'Hf': '12', 'Ta': '5', 'W': '6', 'Re': '7', 'Os': '8', 'Ir': '9',
              'Pt': '18', 'Au': '19', 'Hg': '12', 'Tl': '3', 'Pb': '4', 'Bi': '5', 'Po': '6', 'At': '7', 'Rn': '8'}
+# TODO: give a default set for each kind of elements
 
 
 class KindSection(object):

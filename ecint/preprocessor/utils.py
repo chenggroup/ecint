@@ -2,11 +2,11 @@ import json
 from os.path import isabs, isdir, exists
 from warnings import warn
 
-import yaml
 from aiida.orm import Computer
 from aiida.orm import StructureData
 from ase import Atoms
 from ase.io import read
+from ruamel import yaml
 
 from ecint.config import default_cp2k_machine
 from ecint.preprocessor.kind import KindSection
@@ -14,12 +14,14 @@ from ecint.preprocessor.kind import KindSection
 
 def load_json(json_path):
     with open(json_path) as f:
+        # d = json.load(f, object_pairs_hook=OrderedDict)
         d = json.load(f)
     return d
 
 
 def load_yaml(yaml_path):
     with open(yaml_path) as f:
+        # d = yaml.load(f, Loader=yaml.RoundTripLoader)
         d = yaml.load(f, Loader=yaml.SafeLoader)
     return d
 
@@ -207,6 +209,8 @@ def get_procs_per_node_from_code_name(code_computer):
         procs_per_node = 28
     elif computer == 'aiida_test':
         procs_per_node = 28
+    elif computer == 'aiida_test_res':
+        procs_per_node = 24
     else:
         procs_per_node = get_procs_per_node(computer)
     return procs_per_node
@@ -214,7 +218,7 @@ def get_procs_per_node_from_code_name(code_computer):
 
 def load_machine(machine):
     """
-
+    TODO: need simplify with pythonic way
     Convert user friendly machine to restrict machine
 
     Args:
@@ -255,10 +259,10 @@ def load_machine(machine):
         nprocs = _machine['nnode'] * procs_per_node
         if ('nprocs' in _machine) or ('n' in _machine):
             warn('You have set both `nnode` and `nprocs`(`n`), and the value of `nprocs`(`n`) will be ignored', Warning)
-    elif ('nprocs' in _machine) or ('n' in _machine):
-        nprocs = _machine.get('nprocs') or _machine.get('n')
+    elif ('nprocs' in _machine) or ('n' in _machine) or ('tot_num_mpiprocs' in _machine):
+        nprocs = _machine.get('nprocs') or _machine.get('n') or _machine.get('tot_num_mpiprocs')
     else:
-        raise KeyError('You must set `nnode` or `nprocs` to appoint computing resources')
+        raise KeyError('You must set `nnode` or `nprocs` or `tot_num_mpiprocs` to appoint computing resources')
     restrict_machine.update({'tot_num_mpiprocs': nprocs})
     # set `walltime`
     if not (('walltime' in _machine) or ('max_wallclock_seconds' in _machine) or ('W' in _machine) or (
@@ -286,7 +290,7 @@ def load_machine(machine):
     return restrict_machine
 
 
-def inp2json(cp2k_input):
+def inp2dict(cp2k_input):
     # TODO: need edit, parse cp2k input file to json format
     pass
 
@@ -315,7 +319,7 @@ def check_config_machine(config=None, machine=None, uniform_func=None):
     Args:
         config (dict): input base config
         machine (dict): input machine
-        uniform_func (function): uniform related paras in `parameters` and `restrict_machine`
+        uniform_func (Callable[[dict, dict], tuple]): uniform related paras in `parameters` and `restrict_machine`
 
     Returns:
         (dict, dict)
