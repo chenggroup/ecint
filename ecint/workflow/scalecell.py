@@ -1,10 +1,9 @@
+import numpy as np
 from aiida.engine import WorkChain
 from aiida.orm import StructureData
 
+from ecint.preprocessor.utils import check_config_machine, inspect_node
 from ecint.workflow.units.base import EnergySingleWorkChain
-from ecint.preprocessor.utils import inspect_node, check_config_machine
-
-import numpy as np
 
 
 class CellOptWorkChain(WorkChain):
@@ -25,17 +24,17 @@ class CellOptWorkChain(WorkChain):
                            namespace='enercalc',
                            exclude=['structure', 'label'])
 
-
-
         spec.outline(
             cls.check_config_machine,
             cls.submit_cellopt,
             cls.inspect_cell_opt,
         )
+
     def check_config_machine(self):
-        check_config_machine(config=self.inputs.enercalc.config,
-                             machine=self.inputs.enercalc.machine
-                             )
+        check_config_machine(
+            config=self.inputs.enercalc.config,
+            machine=self.inputs.enercalc.machine
+        )
 
     def submit_cellopt(self):
         """
@@ -47,25 +46,22 @@ class CellOptWorkChain(WorkChain):
         # TODO: 0.95:1.05:0.01
         # initial the scaling parameter
 
-        scale_list = np.arange(0.95, 1.05, 0.01)
+        self.ctx.scale_list = np.arange(0.95, 1.05, 0.01)
         cell = struct.get_cell()
-        for scale in scale_list:
+        for i, scale in enumerate(self.ctx.scale_list):
             tmp = struct.copy()
-            tmp.set_cell(cell*scale, scale_atoms=True)
+            tmp.set_cell(cell * scale, scale_atoms=True)
             tmp_struct_data = StructureData(ase=tmp)
             tmp_struct_data.store()
-            self.submit(EnergySingleWorkChain,
-                        structure=tmp_struct_data,
-                        label='scale {0}'.format(scale)
-                        **self.exposed_inputs(EnergySingleWorkChain,
-                                              namespace='enercalc')
-                        )
+            node = self.submit(
+                EnergySingleWorkChain,
+                structure=tmp_struct_data,
+                label='scale {0}'.format(scale),
+                **self.exposed_inputs(EnergySingleWorkChain,
+                                      namespace='enercalc')
+            )
+            self.to_context(**{f'cellopt_{i}': node})
 
-        return ToContext(reactant_workchain=node_reactant)
-
-
-
-
-
-
-
+    def inspect_cellopt(self):
+        for i in range(len(self.ctx.scale_list)):
+            inspect_node(self.ctx[f'cellopt_{i}'])
