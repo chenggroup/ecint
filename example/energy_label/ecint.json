@@ -1,0 +1,48 @@
+{
+  "workflow": "EnergySingleWorkChain",
+  "webhook": "https://oapi.dingtalk.com/robot/send?access_token=xxx",
+  "resdir": "results_json",
+  "structure": "Hematite.xyz",
+  "metadata": {
+    "kind_section": {
+      "Fe1": {
+        "ELEMENT": "Fe",
+        "BASIS_SET": "DZVP-MOLOPT-SR-GTH",
+        "POTENTIAL": "GTH-PBE",
+        "BS":{
+          "BETA":{
+            "N": "4 3",
+            "NEL": "-2 -6",
+            "L": "0 2"
+          },
+          "ALPHA":{
+            "N": "4 3",
+            "NEL": "-2 +4",
+            "L": "0 2"
+          }
+        }
+      },
+      "Fe2": {
+        "ELEMENT": "Fe",
+        "BASIS_SET": "DZVP-MOLOPT-SR-GTH",
+        "POTENTIAL": "GTH-PBE",
+        "BS":{
+          "ALPHA":{
+            "N": "4 3",
+            "NEL": "-2 -6",
+            "L": "0 2"
+          },
+          "BETA":{
+            "N": "4 3",
+            "NEL": "-2 +4",
+            "L": "0 2"
+          }
+        }
+      },
+      "O": {
+        "BASIS_SET": "DZVP-MOLOPT-SR-GTH",
+        "POTENTIAL": "GTH-PBE"
+      }
+    }
+  }
+}
