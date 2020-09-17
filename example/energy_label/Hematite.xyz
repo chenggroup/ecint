@@ -1,5 +1,5 @@
 30
-Lattice="5.038 0.0 0.0 -2.518999999999999 4.363035984266003 0.0 0.0 0.0 13.772" Properties=species:S:1:pos:R:3:Z:I:1 spacegroup="R -3 c" unit_cell=conventional pbc="T T T"
+Lattice="5.038 0.0 0.0 -2.518999999999999 4.363035984266003 0.0 0.0 0.0 13.772" Properties=species:S:1:pos:R:3:tags:I:1 spacegroup="R -3 c" unit_cell=conventional pbc="T T T"
 Fe       0.00000000       2.90869066       0.30252493       1
 O       0.97787580       1.45434533       1.14766667        0
 O       3.28956210       0.11969262       1.14766667        0
