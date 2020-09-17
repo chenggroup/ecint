@@ -4,6 +4,7 @@
   "resdir": "results_json",
   "structure": "Hematite.xyz",
   "metadata": {
+    "config": "config.yaml",
     "kind_section": {
       "Fe1": {
         "ELEMENT": "Fe",
