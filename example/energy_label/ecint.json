@@ -5,7 +5,7 @@
   "structure": "Hematite.xyz",
   "metadata": {
     "kind_section": {
-      "Fe": {
+      "Fe1": {
         "ELEMENT": "Fe",
         "BASIS_SET": "DZVP-MOLOPT-SR-GTH",
         "POTENTIAL": "GTH-PBE",
@@ -22,7 +22,7 @@
           }
         }
       },
-      "Na": {
+      "Fe2": {
         "ELEMENT": "Fe",
         "BASIS_SET": "DZVP-MOLOPT-SR-GTH",
         "POTENTIAL": "GTH-PBE",
