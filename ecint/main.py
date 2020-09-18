@@ -228,8 +228,8 @@ class Ecint(WorkChain):
 
 
 def check_webhook(webhook):
-    dingtalk_webhook_start = 'https://oapi.dingtalk.com/robot/send' \
-                             '?access_token= '
+    dingtalk_webhook_start = ('https://oapi.dingtalk.com/robot/send'
+                              '?access_token=')
     if webhook:
         if isinstance(webhook, str):
             if not webhook.startswith(dingtalk_webhook_start):
