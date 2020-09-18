@@ -1,10 +1,14 @@
 from abc import ABCMeta, abstractmethod
 
-from aiida.orm import Dict, Code, StructureData
+from aiida.orm import Code, Dict, StructureData
 from aiida_cp2k.workchains import Cp2kBaseWorkChain
 from ase import Atoms
 
-from ecint.preprocessor.utils import load_machine, get_procs_per_node_from_code_name, uniform_neb
+from ecint.preprocessor.utils import get_procs_per_node_from_code_name, \
+    load_machine, uniform_neb
+
+__all__ = ['EnergyPreprocessor', 'GeooptPreprocessor', 'NebPreprocessor',
+           'FrequencyPreprocessor']
 
 
 class Preprocessor(metaclass=ABCMeta):
@@ -39,21 +43,27 @@ class Cp2kPreprocessor(Preprocessor):
     # TODO: make general Preprocessor for another job scheduler, now just for LSF
     @property
     def builder(self):
-        builder = Cp2kBaseWorkChain.get_builder()
+        _builder = Cp2kBaseWorkChain.get_builder()
         if isinstance(self.structure, StructureData):
-            builder.cp2k.structure = self.structure
+            _builder.cp2k.structure = self.structure
         elif isinstance(self.structure, Atoms):
-            builder.cp2k.structure = StructureData(ase=self.structure)
-        builder.cp2k.parameters = self.parameters
-        builder.cp2k.code = Code.get_from_string(self.machine.get('code@computer'))
-        builder.cp2k.metadata.options.resources = {'tot_num_mpiprocs': self.machine.get('tot_num_mpiprocs')}
+            _builder.cp2k.structure = StructureData(ase=self.structure)
+        _builder.cp2k.parameters = self.parameters
+        _builder.cp2k.code = Code.get_from_string(
+            self.machine.get('code@computer'))
+        _builder.cp2k.metadata.options.resources = {
+            'tot_num_mpiprocs': self.machine.get('tot_num_mpiprocs')}
         if self.machine.get('max_wallclock_seconds'):
-            builder.cp2k.metadata.options.max_wallclock_seconds = self.machine.get('max_wallclock_seconds')
+            _builder.cp2k.metadata.options.max_wallclock_seconds = self.machine.get(
+                'max_wallclock_seconds')
         if self.machine.get('queue_name'):
-            builder.cp2k.metadata.options.queue_name = self.machine.get('queue_name')
+            _builder.cp2k.metadata.options.queue_name = self.machine.get(
+                'queue_name')
         if self.machine.get('custom_scheduler_commands'):
-            builder.cp2k.metadata.options.custom_scheduler_commands = self.machine.get('custom_scheduler_commands')
-        return builder
+            _builder.cp2k.metadata.options.custom_scheduler_commands = self.machine.get(
+                'custom_scheduler_commands')
+        # _builder.cp2k.metadata.dry_run = True
+        return _builder
 
 
 class EnergyPreprocessor(Cp2kPreprocessor):

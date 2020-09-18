@@ -5,9 +5,12 @@ from warnings import warn
 
 from aiida_cp2k.utils import Cp2kInput
 
-from ecint.preprocessor.kind import KindSection, DZVPPBE
-from ecint.preprocessor.utils import update_dict, load_config
+from ecint.preprocessor.kind import DZVPPBE, KindSection
+from ecint.preprocessor.utils import load_config, update_dict
 from ecint.workflow.units import CONFIG_DIR
+
+__all__ = ['EnergyInputSets', 'GeooptInputSets', 'NebInputSets',
+           'FrequencyInputSets']
 
 
 class BaseInput(metaclass=ABCMeta):
@@ -79,10 +82,10 @@ class InputSets(BaseInput):
             kind_section (KindSection or list): elements kind section
 
         """
-        self.check_global(config)
         self._structure = structure
         self._config = config
         self._kind_section = kind_section
+        self.check_global(self.config)
 
     @property
     def structure(self):
@@ -181,11 +184,13 @@ class UnitsInputSets(InputSets):
         kind_section (KindSection or list): elements kind section
 
     """
+    TypeMap = {}
 
     @property
     def config(self):
         if isinstance(self._config, str):
-            units_config_path = os.path.join(CONFIG_DIR, self._config)
+            units_config_path = os.path.join(CONFIG_DIR,
+                                             self.TypeMap[self._config])
             units_config = load_config(units_config_path)
         elif isinstance(self._config, dict):
             units_config = self._config
@@ -195,24 +200,38 @@ class UnitsInputSets(InputSets):
 
 
 class EnergyInputSets(UnitsInputSets):
-    def __init__(self, structure, config='energy.json', kind_section=DZVPPBE()):
+    TypeMap = {'default': 'energy.json', 'metal': 'energy.json',
+               'semiconductor': 'energy_smo_k.json'}
+
+    def __init__(self, structure, config='metal', kind_section=DZVPPBE()):
         super(EnergyInputSets, self).__init__(structure, config, kind_section)
-        self.add_config({"GLOBAL": {"RUN_TYPE": "ENERGY", "PRINT_LEVEL": "MEDIUM"}})
+        self.add_config(
+            {"GLOBAL": {"RUN_TYPE": "ENERGY", "PRINT_LEVEL": "MEDIUM"}})
 
 
 class GeooptInputSets(UnitsInputSets):
-    def __init__(self, structure, config='geoopt.json', kind_section=DZVPPBE()):
+    TypeMap = {'default': 'geoopt.json'}
+
+    def __init__(self, structure, config='test', kind_section=DZVPPBE()):
         super(GeooptInputSets, self).__init__(structure, config, kind_section)
-        self.add_config({"GLOBAL": {"RUN_TYPE": "GEO_OPT", "PRINT_LEVEL": "MEDIUM"}})
+        self.add_config(
+            {"GLOBAL": {"RUN_TYPE": "GEO_OPT", "PRINT_LEVEL": "MEDIUM"}})
 
 
 class NebInputSets(UnitsInputSets):
-    def __init__(self, structure, config='neb.json', kind_section=DZVPPBE()):
+    TypeMap = {'default': 'neb.json'}
+
+    def __init__(self, structure, config='test', kind_section=DZVPPBE()):
         super(NebInputSets, self).__init__(structure, config, kind_section)
-        self.add_config({"GLOBAL": {"RUN_TYPE": "BAND", "PRINT_LEVEL": "MEDIUM"}})
+        self.add_config(
+            {"GLOBAL": {"RUN_TYPE": "BAND", "PRINT_LEVEL": "MEDIUM"}})
 
 
 class FrequencyInputSets(UnitsInputSets):
-    def __init__(self, structure, config='frequency.json', kind_section=DZVPPBE()):
-        super(FrequencyInputSets, self).__init__(structure, config, kind_section)
-        self.add_config({"GLOBAL": {"RUN_TYPE": "VIBRATIONAL_ANALYSIS", "PRINT_LEVEL": "MEDIUM"}})
+    TypeMap = {'default': 'frequency.json'}
+
+    def __init__(self, structure, config='test', kind_section=DZVPPBE()):
+        super(FrequencyInputSets, self).__init__(structure, config,
+                                                 kind_section)
+        self.add_config({"GLOBAL": {"RUN_TYPE": "VIBRATIONAL_ANALYSIS",
+                                    "PRINT_LEVEL": "MEDIUM"}})

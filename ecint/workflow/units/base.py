@@ -3,22 +3,25 @@ import re
 
 import numpy as np
 from aiida.engine import WorkChain
-from aiida.orm import StructureData, TrajectoryData, List, Int
+from aiida.orm import Float, List, StructureData, TrajectoryData
 
-from ecint.config import RESULT_NAME, default_cp2k_machine, default_cp2k_large_machine
-from ecint.postprocessor.utils import AU2EV, write_xyz_from_structure, write_xyz_from_trajectory, get_last_frame
+from ecint.config import default_cp2k_large_machine, default_cp2k_machine, \
+    RESULT_NAME
+from ecint.postprocessor.utils import AU2EV, get_last_frame, \
+    write_xyz_from_structure, write_xyz_from_trajectory
 from ecint.postprocessor.visualization import plot_energy_curve
-from ecint.preprocessor import EnergyPreprocessor, GeooptPreprocessor, NebPreprocessor, FrequencyPreprocessor
-from ecint.preprocessor.input import EnergyInputSets, GeooptInputSets, NebInputSets, FrequencyInputSets
-from ecint.preprocessor.kind import KindSection, DZVPPBE
-from ecint.preprocessor.utils import load_config, inspect_node, check_config_machine, uniform_neb
-from ecint.workflow.units import CONFIG_DIR
+from ecint.preprocessor import *
+from ecint.preprocessor.input import *
+from ecint.preprocessor.kind import DZVPPBE, KindSection
+from ecint.preprocessor.utils import check_config_machine, inspect_node, \
+    uniform_neb
 
-__all__ = ['EnergySingleWorkChain', 'GeooptSingleWorkChain', 'NebSingleWorkChain', 'FrequencySingleWorkChain']
+__all__ = ['EnergySingleWorkChain', 'GeooptSingleWorkChain',
+           'NebSingleWorkChain', 'FrequencySingleWorkChain']
 
 
-def load_default_config(config_name):
-    return load_config(os.path.join(CONFIG_DIR, config_name))
+# def load_default_config(config_name):
+#     return load_config(os.path.join(CONFIG_DIR, config_name))
 
 
 class BaseSingleWorkChain(WorkChain):
@@ -27,14 +30,17 @@ class BaseSingleWorkChain(WorkChain):
         super(BaseSingleWorkChain, cls).define(spec)
         spec.input('resdir', valid_type=str, required=True, non_db=True)
         # to distinguish different file name, `label` used inside WorkChain, it is unnecessary for user input
-        spec.input('label', default='', valid_type=str, required=False, non_db=True)
+        spec.input('label', default='', valid_type=str, required=False,
+                   non_db=True)
         # structure or structures
         # spec.input('structure', valid_type=StructureData, required=False)
         # need add config in sub singleworkchain, e.g.
-        # spec.input('config', default=load_default_config('config.json'),
-        #            valid_type=dict, required=False, non_db=True)
-        spec.input('kind_section', valid_type=(list, KindSection), default=DZVPPBE(), required=False, non_db=True)
-        spec.input('machine', valid_type=dict, default=default_cp2k_machine, required=False, non_db=True)
+        spec.input('config', default='default', valid_type=(str, dict),
+                   required=False, non_db=True)
+        spec.input('kind_section', valid_type=(list, KindSection),
+                   default=DZVPPBE(), required=False, non_db=True)
+        spec.input('machine', valid_type=dict, default=default_cp2k_machine,
+                   required=False, non_db=True)
 
         # define spec.outline like follows in sub singleworkchain
         """
@@ -71,8 +77,6 @@ class EnergySingleWorkChain(BaseSingleWorkChain):
         super(EnergySingleWorkChain, cls).define(spec)
         spec.input('label', default='coords', valid_type=str, required=False, non_db=True)
         spec.input('structure', valid_type=StructureData, required=True)
-        spec.input('config', default=load_default_config('energy.json'),
-                   valid_type=dict, required=False, non_db=True)
 
         spec.outline(
             cls.check_config_machine,
@@ -97,8 +101,9 @@ class EnergySingleWorkChain(BaseSingleWorkChain):
         inspect_node(self.ctx.energy_workchain)
 
     def get_energy(self):
-        self.ctx.energy = self.ctx.energy_workchain.outputs.output_parameters.get_attribute('energy') * AU2EV
-        energy_data = Int(self.ctx.energy)
+        self.ctx.energy = self.ctx.energy_workchain.outputs.output_parameters.get_attribute(
+            'energy') * AU2EV
+        energy_data = Float(self.ctx.energy)
         self.out('energy', energy_data.store())
 
     def write_results(self):
@@ -120,8 +125,6 @@ class GeooptSingleWorkChain(BaseSingleWorkChain):
         super(GeooptSingleWorkChain, cls).define(spec)
         spec.input('label', default='structure', valid_type=str, required=False, non_db=True)
         spec.input('structure', valid_type=StructureData, required=True)
-        spec.input('config', default=load_default_config('geoopt.json'),
-                   valid_type=dict, required=False, non_db=True)
 
         spec.outline(
             cls.check_config_machine,
@@ -176,8 +179,6 @@ class NebSingleWorkChain(BaseSingleWorkChain):
         # the last image_N as product
         # For provenance graph, need StructureData instead of List
         spec.input_namespace('structures', valid_type=StructureData, dynamic=True)
-        spec.input('config', default=load_default_config('neb.json'),
-                   valid_type=dict, required=False, non_db=True)
         spec.input('machine', valid_type=dict, default=default_cp2k_large_machine, required=False, non_db=True)
 
         spec.outline(
@@ -272,8 +273,6 @@ class FrequencySingleWorkChain(BaseSingleWorkChain):
     def define(cls, spec):
         super(FrequencySingleWorkChain, cls).define(spec)
         spec.input('structure', valid_type=StructureData, required=True)
-        spec.input('config', default=load_default_config('frequency.json'),
-                   valid_type=dict, required=False, non_db=True)
         spec.input('machine', valid_type=dict, default=default_cp2k_large_machine, required=False, non_db=True)
 
         spec.outline(
@@ -312,8 +311,10 @@ class FrequencySingleWorkChain(BaseSingleWorkChain):
         # write frequency value
         output_frequency_name = 'frequency.txt'
         freq_list = self.ctx.frequency_data.get_list()
-        np.savetxt('frequency.txt', freq_list, fmt='%-15s%-15s%-15s', header='VIB|Frequency (cm^-1)')
+        np.savetxt('frequency.txt', freq_list, fmt='%-15s%-15s%-15s',
+                   header='VIB|Frequency (cm^-1)')
 
         with open(RESULT_NAME, 'a') as f:
-            f.write(f'# Step: Frequency, PK: {self.ctx.frequency_workchain.pk}\n')
+            f.write(
+                f'# Step: Frequency, PK: {self.ctx.frequency_workchain.pk}\n')
             f.write(f'frequency file: {output_frequency_name}')
