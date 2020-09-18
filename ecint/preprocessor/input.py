@@ -42,9 +42,14 @@ class BaseInput(metaclass=ABCMeta):
         """
 
         Returns:
-            list[dict]: kind section list of dict,
-                        e.g. [{'_': 'H', 'BASIS_SET': 'TZV2P-MOLOPT-GTH', 'POTENTIAL': 'GTH-PBE'},
-                              {'_': 'O', 'BASIS_SET': 'TZV2P-MOLOPT-GTH', 'POTENTIAL': 'GTH-PBE'}]
+            list[dict]:
+                kind section list of dict,
+                e.g. [{'_': 'H',
+                       'BASIS_SET': 'TZV2P-MOLOPT-GTH',
+                       'POTENTIAL': 'GTH-PBE'},
+                      {'_': 'O',
+                       'BASIS_SET': 'TZV2P-MOLOPT-GTH',
+                       'POTENTIAL': 'GTH-PBE'}]
 
         """
         pass
@@ -104,14 +109,18 @@ class InputSets(BaseInput):
     @property
     def kind_section(self):
         if isinstance(self._kind_section, KindSection):
-            if (self._kind_section.structure is not None) and (self._kind_section.structure != self.structure):
-                warn('You have set structure in KindSection, this structure will be replaced by structure in InputSets',
+            if (self._kind_section.structure is not None) and (
+                    self._kind_section.structure != self.structure):
+                warn('You have set structure in KindSection, this structure '
+                     'will be replaced by structure in InputSets',
                      UserWarning)
             self._kind_section.load_structure(self.structure)
             kind_section_list = self._kind_section.kind_section
         elif isinstance(self._kind_section, list):
             # evaluate if elements in _kind_section match elements in structure
-            elements_in_kind_duplicate = [one_kind_section["_"] for one_kind_section in self._kind_section]
+            elements_in_kind_duplicate = [one_kind_section["_"] for
+                                          one_kind_section in
+                                          self._kind_section]
             elements_in_kind = set(elements_in_kind_duplicate)
             if len(elements_in_kind_duplicate) != len(elements_in_kind):
                 raise ValueError('Duplicate elements in kind section')
@@ -124,9 +133,11 @@ class InputSets(BaseInput):
                     if one_kind_section["_"] in elements_in_structure:
                         kind_section_list.append(one_kind_section)
             else:
-                raise ValueError('Elements in kind section does not match elements in structure')
+                raise ValueError('Elements in kind section does not '
+                                 'match elements in structure')
         else:
-            raise TypeError('Input kind_section need be `KindSection` or `dict`')
+            raise TypeError('Input kind_section need be '
+                            '`KindSection` or `dict`')
         return kind_section_list
 
     def _update_subsys(self, subsys):
@@ -136,15 +147,19 @@ class InputSets(BaseInput):
         update_dict(subsys, {"KIND": self.kind_section})
         # add structure cell info
         for i, letter in enumerate('ABC'):
-            update_dict(subsys, {"CELL": {letter: '{:<15} {:<15} {:<15}'.format(*self.structure.cell[i])}})
+            update_dict(subsys, {"CELL": {letter: '{:<15} {:<15} {:<15}'
+                        .format(*self.structure.cell[i])}})
         # TODO: add more pbc function, like treating with (False, False, True)
         if self.structure.pbc == (False, False, False):
             update_dict(subsys, {"CELL": {"PERIODIC": "NONE"}})
         # # add structure coordinate info
         # atoms = self.structure.get_ase()
-        # tags = np.char.array(['' if tag == 0 else str(tag) for tag in atoms.get_tags()])
-        # symbols = np.char.array([symbol.ljust(2) for symbol in atoms.get_chemical_symbols()]) + tags
-        # positions = np.char.array(['{:20.10f} {:20.10f} {:20.10f}'.format(p[0], p[1], p[2])
+        # tags = np.char.array([
+        # '' if tag == 0 else str(tag) for tag in atoms.get_tags()])
+        # symbols = np.char.array([
+        # symbol.ljust(2) for symbol in atoms.get_chemical_symbols()]) + tags
+        # positions = np.char.array(['{:20.10f} {:20.10f} {:20.10f}'
+        #                            .format(p[0], p[1], p[2])
         #                            for p in atoms.get_positions()])
         # coords = symbols + positions
         # update_dict(subsys, {"COORD": {"": coords.tolist()}})
@@ -152,7 +167,8 @@ class InputSets(BaseInput):
     @classmethod
     def check_global(cls, config):
         if config.get('GLOBAL'):
-            raise ValueError('You can not set `GLOBAL` section for a specific workflow')
+            raise ValueError('You can not set `GLOBAL` section '
+                             'for a specific workflow')
 
     @property
     def input_sets(self):
@@ -195,7 +211,8 @@ class UnitsInputSets(InputSets):
         elif isinstance(self._config, dict):
             units_config = self._config
         else:
-            raise TypeError(f'Units config should use config file under {CONFIG_DIR}')
+            raise TypeError(f'Units config should use config file under '
+                            f'{CONFIG_DIR}')
         return units_config
 
 
@@ -205,8 +222,8 @@ class EnergyInputSets(UnitsInputSets):
 
     def __init__(self, structure, config='metal', kind_section=DZVPPBE()):
         super(EnergyInputSets, self).__init__(structure, config, kind_section)
-        self.add_config(
-            {"GLOBAL": {"RUN_TYPE": "ENERGY", "PRINT_LEVEL": "MEDIUM"}})
+        self.add_config({"GLOBAL": {"RUN_TYPE": "ENERGY",
+                                    "PRINT_LEVEL": "MEDIUM"}})
 
 
 class GeooptInputSets(UnitsInputSets):
@@ -214,8 +231,8 @@ class GeooptInputSets(UnitsInputSets):
 
     def __init__(self, structure, config='test', kind_section=DZVPPBE()):
         super(GeooptInputSets, self).__init__(structure, config, kind_section)
-        self.add_config(
-            {"GLOBAL": {"RUN_TYPE": "GEO_OPT", "PRINT_LEVEL": "MEDIUM"}})
+        self.add_config({"GLOBAL": {"RUN_TYPE": "GEO_OPT",
+                                    "PRINT_LEVEL": "MEDIUM"}})
 
 
 class NebInputSets(UnitsInputSets):
@@ -223,8 +240,8 @@ class NebInputSets(UnitsInputSets):
 
     def __init__(self, structure, config='test', kind_section=DZVPPBE()):
         super(NebInputSets, self).__init__(structure, config, kind_section)
-        self.add_config(
-            {"GLOBAL": {"RUN_TYPE": "BAND", "PRINT_LEVEL": "MEDIUM"}})
+        self.add_config({"GLOBAL": {"RUN_TYPE": "BAND",
+                                    "PRINT_LEVEL": "MEDIUM"}})
 
 
 class FrequencyInputSets(UnitsInputSets):

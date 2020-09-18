@@ -1,18 +1,19 @@
 import importlib
 import os
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from warnings import warn
 
 import click
 from aiida import load_profile
-from aiida.engine import WorkChain, submit, if_
+from aiida.engine import if_, submit, WorkChain
 from ase.io.formats import UnknownFileTypeError
 from tqdm import tqdm
 
 from ecint.config import RESULT_NAME
 from ecint.postprocessor.utils import notification_in_dingtalk
 from ecint.preprocessor.kind import KindSection
-from ecint.preprocessor.utils import load_json, load_yaml, load_config, load_structure, load_kind, load_machine
+from ecint.preprocessor.utils import load_config, load_json, load_kind, \
+    load_machine, load_structure, load_yaml
 
 load_profile()
 
@@ -30,17 +31,21 @@ class UserInput(object):
     webhook: str = None
     resdir: str = field(default=os.getcwd())
     # structure section
-    structures_folder: str = None  # if set, high-throughput calc will run, conflicting with `structure`
+    # if set, high-throughput calc will run, conflicting with `structure`
+    structures_folder: str = None
     structure: str or list = None
     cell: list = field(default_factory=list)
     pbc: bool or list = True
-    metadata: dict = field(default_factory=dict)  # SubData and other special paras
-    subdata: dict = field(default_factory=dict)  # {str: SubData(config, kind_section, machine), ...}
+    # metadata: SubData and other special paras
+    metadata: dict = field(default_factory=dict)
+    # subdata: {str: SubData(config, kind_section, machine), ...}
+    subdata: dict = field(default_factory=dict)
 
     @property
     def has_structures_folder(self):
         if self.structure and self.structures_folder:
-            raise KeyError('`structure` and `structures_folder` can not coexist')
+            raise KeyError('`structure` and `structures_folder` '
+                           'can not coexist')
         return True if self.structures_folder else False
 
     def get_workflow_inp(self):
@@ -51,16 +56,24 @@ class UserInput(object):
                 structure_bar = tqdm(os.listdir(self.structures_folder))
                 for i, structure_file in enumerate(structure_bar):
                     try:
-                        structure_bar.set_description(f'Upload {structure_file}')
-                        structure_dir = os.path.join(self.structures_folder, structure_file)
-                        workflow_inp.append({'structure': load_structure(structure_dir, self.cell, self.pbc),
-                                             **load_input(asdict(self), resdir=os.path.join(self.resdir, str(i)))})
+                        structure_bar.set_description(f'Upload '
+                                                      f'{structure_file}')
+                        structure_dir = os.path.join(self.structures_folder,
+                                                     structure_file)
+                        resdir = os.path.join(self.resdir, str(i))
+                        workflow_inp.append({'structure':
+                                                 load_structure(structure_dir,
+                                                                self.cell,
+                                                                self.pbc),
+                                             **load_input(asdict(self),
+                                                          resdir=resdir)})
                     except UnknownFileTypeError as te:
                         warn(f'{structure_file}: {str(te)}', Warning)
             else:
                 raise ValueError('`structures_folder` is not a folder')
         else:
-            workflow_inp = {**load_s(asdict(self)), **load_input(asdict(self), resdir=self.resdir)}
+            workflow_inp = {**load_s(asdict(self)),
+                            **load_input(asdict(self), resdir=self.resdir)}
         return workflow_inp
 
 
@@ -88,8 +101,11 @@ def _load_subdata(subdata):
     # check kind_section
     if subdata.get('kind_section'):
         kind_section = subdata.pop('kind_section')
-        if isinstance(kind_section, dict) and ('BASIS_SET' in kind_section) and ('POTENTIAL' in kind_section):
-            _kind_section = KindSection(kind_section['BASIS_SET'], kind_section['POTENTIAL'])
+        if (isinstance(kind_section, dict) and
+                ('BASIS_SET' in kind_section) and
+                ('POTENTIAL' in kind_section)):
+            _kind_section = KindSection(kind_section['BASIS_SET'],
+                                        kind_section['POTENTIAL'])
             workflow_inp.update({'kind_section': _kind_section})
         else:
             workflow_inp.update({'kind_section': load_kind(kind_section)})
@@ -112,7 +128,8 @@ def load_input(user_input, resdir):
     if isinstance(resdir, str):
         if hasattr(workflow, 'SUB'):
             for submeta in workflow.SUB:
-                workflow_inp.update({submeta: {'resdir': os.path.abspath(resdir)}})
+                workflow_inp.update({submeta: {'resdir':
+                                                   os.path.abspath(resdir)}})
         else:
             workflow_inp.update({'resdir': os.path.abspath(resdir)})
     else:
@@ -131,7 +148,8 @@ def load_input(user_input, resdir):
         subdata = user_input.pop('subdata')
         for submeta, subinfo in subdata.items():
             if submeta not in workflow.SUB:
-                raise KeyError(f'Unknown {submeta} in {user_input.get("workflow")}')
+                raise KeyError(
+                    f'Unknown {submeta} in {user_input.get("workflow")}')
             else:
                 workflow_inp[submeta].update(**_load_subdata(subinfo))
     # check structure
@@ -147,24 +165,30 @@ def load_s(user_input):
     if structure_files:
         workflow_inp = {}
         if isinstance(structure_files, str) and os.path.isfile(structure_files):
-            workflow_inp.update({'structure': load_structure(structure_files, cell, pbc)})
+            workflow_inp.update({'structure': load_structure(structure_files,
+                                                             cell,
+                                                             pbc)})
         elif isinstance(structure_files, list):
             if len(structure_files) < 2:
-                raise ValueError('The input `structure` list should be at least two')
+                raise ValueError(
+                    'The input `structure` list should be at least two')
             structures = {}
             for i, structure_file in enumerate(structure_files):
                 structure = load_structure(structure_file, cell, pbc)
                 structures.update({f'image_{i}': structure})
             workflow_inp.update({'structures': structures})
         else:
-            raise ValueError('No valid `structure`, it can be a single structure or a list of structures')
+            raise ValueError('No valid `structure`, '
+                             'it can be a single structure or '
+                             'a list of structures')
     else:
         raise KeyError('You need set structure')
     return workflow_inp
 
 
 # def check_dict(mapping):
-#     """Purpose for undoing aiida default serializer, to avoid OrderedDict Error"""
+#     """Purpose for undoing aiida default serializer,
+#     to avoid OrderedDict Error"""
 #     if isinstance(mapping, dict):
 #         return mapping
 #     else:
@@ -175,7 +199,8 @@ class Ecint(WorkChain):
     @classmethod
     def define(cls, spec):
         super(Ecint, cls).define(spec)
-        spec.input('webhook', valid_type=(str, type(None)), required=False, non_db=True)
+        spec.input('webhook', valid_type=(str, type(None)), required=False,
+                   non_db=True)
         spec.input('workflow', valid_type=str, required=True, non_db=True)
         spec.input('workflow_inp', valid_type=dict, required=False, non_db=True)
 
@@ -191,7 +216,8 @@ class Ecint(WorkChain):
         return True if self.inputs.get('webhook') else False
 
     def submit_workchain(self):
-        node = self.submit(load_workflow(self.inputs.workflow), **self.inputs.workflow_inp)
+        node = self.submit(load_workflow(self.inputs.workflow),
+                           **self.inputs.workflow_inp)
         self.to_context(workchain=node)
 
     def inspect_workchain(self):
@@ -202,7 +228,8 @@ class Ecint(WorkChain):
 
 
 def check_webhook(webhook):
-    dingtalk_webhook_start = 'https://oapi.dingtalk.com/robot/send?access_token='
+    dingtalk_webhook_start = 'https://oapi.dingtalk.com/robot/send' \
+                             '?access_token= '
     if webhook:
         if isinstance(webhook, str):
             if not webhook.startswith(dingtalk_webhook_start):
@@ -222,7 +249,8 @@ def _submit_ecint(resdir, webhook, workflow, workflow_inp):
         resdir (str): results directory for workflow
         webhook (str): webhook for notification
         workflow (str): workflow name
-        workflow_inp (dict): workflow input, e.g. {'structure':, 'resdir':, 'config':, 'kind_section':, 'machine':}
+        workflow_inp (dict): workflow input,
+        e.g. {'structure':, 'resdir':, 'config':, 'kind_section':, 'machine':}
 
     Returns:
         None
@@ -255,7 +283,9 @@ def submit_from_file(input_file):
 
     """
     # load input
-    ecint_input = load_json(input_file) if input_file.endswith('.json') else load_yaml(input_file)
+    ecint_input = (load_json(input_file)
+                   if input_file.endswith('.json')
+                   else load_yaml(input_file))
     userinput = UserInput(**ecint_input)
     # check webhook
     webhook = userinput.webhook

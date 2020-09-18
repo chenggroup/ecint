@@ -1,11 +1,15 @@
 import json
-from os.path import isabs, isdir, exists
+import sys
+from itertools import groupby
+from os.path import exists, isabs, isdir
+from pathlib import PurePath
 from warnings import warn
 
-from aiida.orm import Computer
-from aiida.orm import StructureData
+import numpy as np
+from aiida.orm import Computer, StructureData
 from ase import Atoms
 from ase.io import read
+from ase.io.extxyz import key_val_str_to_dict
 from ruamel import yaml
 
 from ecint.config import default_cp2k_machine
@@ -26,7 +30,32 @@ def load_yaml(yaml_path):
     return d
 
 
-def load_structure(structure, cell=None, pbc=True):
+def _preparse_xyz(filename, **kwargs):
+    try:
+        atoms = read(filename, **kwargs)
+    except KeyError:
+        if isinstance(filename, PurePath):
+            filename = str(filename)
+        if filename == '-':
+            filename = sys.stdin
+        with open(filename, 'r') as f:
+            xyz_lines = f.readlines()
+        kind_lines = np.array([line.strip().split() for line in xyz_lines[2:]])
+        symbols, tags = [], []
+        for kind_line in kind_lines[:, 0]:
+            symbol_with_tag = [''.join(list(g)) for k, g in
+                               groupby(kind_line, key=lambda x: x.isdigit())]
+            symbols.append(symbol_with_tag[0])
+            tags.append(int(symbol_with_tag[1])) \
+                if len(symbol_with_tag) == 2 else tags.append(0)
+        comment_line_info = key_val_str_to_dict(xyz_lines[1])
+        atoms = Atoms(symbols=symbols, positions=kind_lines[:, 1:], tags=tags,
+                      cell=comment_line_info.get("Lattice"),
+                      pbc=comment_line_info.get("pbc"))
+    return atoms
+
+
+def load_structure(structure, cell=None, pbc=True, **kwargs):
     """
 
     Convert various structure formats to StructureData
@@ -45,14 +74,15 @@ def load_structure(structure, cell=None, pbc=True):
     elif isinstance(structure, Atoms):
         _structure = StructureData(ase=structure)
     elif isinstance(structure, str):
-        atoms = read(structure)
+        atoms = _preparse_xyz(structure, **kwargs)
         if not atoms.get_cell():
             atoms.set_cell(cell)
         atoms.set_pbc(pbc)
         _structure = StructureData(ase=atoms)
     else:
-        raise TypeError('Please use correct format of `structure`, ase.Atoms, aiida.orm.StructureData or '
-                        'valid structure file')
+        raise TypeError('Please use correct format of `structure`, '
+                        'ase.Atoms, aiida.orm.StructureData '
+                        'or valid structure file')
     return _structure
 
 
@@ -78,7 +108,8 @@ def load_config(config):
         else:
             raise ValueError('Config file should be .json or .yaml file')
     else:
-        raise TypeError('Please use correct format of `config`, dict or your .json/.yaml file path')
+        raise TypeError('Please use correct format of `config`, '
+                        'dict or your .json/.yaml file path')
     return config_dict
 
 
@@ -99,7 +130,8 @@ def load_kind(kind_section):
     elif isinstance(kind_section, list):
         kind_section_list = kind_section
     elif isinstance(kind_section, dict):
-        kind_section_list = [{'_': element, **one_kind_section} for element, one_kind_section in kind_section.items()]
+        kind_section_list = [{'_': element, **one_kind_section} for
+                             element, one_kind_section in kind_section.items()]
     elif isinstance(kind_section, str):
         if kind_section.endswith('.yaml') or kind_section.endswith('.yml'):
             _kind_section = load_yaml(kind_section)
@@ -110,8 +142,11 @@ def load_kind(kind_section):
         kind_section_list = load_kind(_kind_section)
     else:
         raise TypeError('Please use correct format of `kind section`, '
-                        'list (e.g. [{"_": "H", "BASIS_SET": "DZVP-MOLOPT-SR-GTH", "POTENTIAL": "GTH-PBE-q1"}, ...]), '
-                        'dict(e.g. {"H": {"BASIS_SET": "DZVP-MOLOPT-SR-GTH", "POTENTIAL": "GTH-PBE-q1"}, ...}) '
+                        'list (e.g. [{"_": "H", '
+                        '"BASIS_SET": "DZVP-MOLOPT-SR-GTH", '
+                        '"POTENTIAL": "GTH-PBE-q1"}, ...]), '
+                        'dict(e.g. {"H": {"BASIS_SET": "DZVP-MOLOPT-SR-GTH", '
+                        '"POTENTIAL": "GTH-PBE-q1"}, ...}) '
                         'or your .json/.yaml file path')
     return kind_section_list
 
@@ -183,7 +218,8 @@ def get_procs_per_node(computer):
     elif default_procs_per_node is None:
         transport = computer.get_transport()
         with transport:
-            retcode, stdout, stderr = transport.exec_command_wait("bhosts | awk '{print $4}' | sed -n '2p'")
+            retcode, stdout, stderr = transport.exec_command_wait(
+                "bhosts | awk '{print $4}' | sed -n '2p'")
             procs_per_node = int(stdout)
         computer.set_default_mpiprocs_per_machine(procs_per_node)
     return procs_per_node
@@ -246,7 +282,8 @@ def load_machine(machine):
         else:
             raise ValueError('Machine file should be .json or .yaml file')
     else:
-        raise TypeError('Please use correct format of `machine`, dict or your .json/.yaml file path')
+        raise TypeError('Please use correct format of `machine`, '
+                        'dict or your .json/.yaml file path')
     restrict_machine = {}
     # set `code@computer`
     if 'code@computer' not in _machine:
@@ -254,29 +291,41 @@ def load_machine(machine):
     else:
         restrict_machine.update({'code@computer': _machine['code@computer']})
     # set `nprocs`
-    procs_per_node = get_procs_per_node_from_code_name(_machine['code@computer'])
+    procs_per_node = get_procs_per_node_from_code_name(
+        _machine['code@computer'])
     if 'nnode' in _machine:
         nprocs = _machine['nnode'] * procs_per_node
         if ('nprocs' in _machine) or ('n' in _machine):
-            warn('You have set both `nnode` and `nprocs`(`n`), and the value of `nprocs`(`n`) will be ignored', Warning)
-    elif ('nprocs' in _machine) or ('n' in _machine) or ('tot_num_mpiprocs' in _machine):
-        nprocs = _machine.get('nprocs') or _machine.get('n') or _machine.get('tot_num_mpiprocs')
+            warn('You have set both `nnode` and `nprocs`(`n`), '
+                 'and the value of `nprocs`(`n`) will be ignored',
+                 Warning)
+    elif (('nprocs' in _machine) or ('n' in _machine) or
+          ('tot_num_mpiprocs' in _machine)):
+        nprocs = (_machine.get('nprocs') or _machine.get('n') or
+                  _machine.get('tot_num_mpiprocs'))
     else:
-        raise KeyError('You must set `nnode` or `nprocs` or `tot_num_mpiprocs` to appoint computing resources')
+        raise KeyError('You must set `nnode` or `nprocs` or `tot_num_mpiprocs` '
+                       'to appoint computing resources')
     restrict_machine.update({'tot_num_mpiprocs': nprocs})
     # set `walltime`
-    if not (('walltime' in _machine) or ('max_wallclock_seconds' in _machine) or ('W' in _machine) or (
-            'w' in _machine)):
-        warn('You should set `walltime`, otherwise your job may waste computing resources', Warning)
+    if not (('walltime' in _machine) or
+            ('max_wallclock_seconds' in _machine) or
+            ('W' in _machine) or ('w' in _machine)):
+        warn('You should set `walltime`, '
+             'otherwise your job may waste computing resources',
+             Warning)
     else:
-        walltime = _machine.get('walltime') or _machine.get('max_wallclock_seconds') \
-                   or _machine.get('W') or _machine.get('w')
+        walltime = (_machine.get('walltime') or
+                    _machine.get('max_wallclock_seconds') or
+                    _machine.get('W') or _machine.get('w'))
         restrict_machine.update({'max_wallclock_seconds': walltime})
     # set `queue_name`
-    if not (('queue' in _machine) or ('queue_name' in _machine) or ('q' in _machine)):
+    if not (('queue' in _machine) or ('queue_name' in _machine) or
+            ('q' in _machine)):
         warn('You have not set `queue`, so default value will be used', Warning)
     else:
-        queue = _machine.get('queue') or _machine.get('queue_name') or _machine.get('q')
+        queue = (_machine.get('queue') or _machine.get('queue_name')
+                 or _machine.get('q'))
         restrict_machine.update({'queue_name': queue})
     # set `ptile`
     if 'ptile' in _machine:
@@ -284,9 +333,10 @@ def load_machine(machine):
     else:
         ptile = procs_per_node
     custom_scheduler_commands = f'#BSUB -R \"span[ptile={ptile}]\"'
-    restrict_machine.update({'custom_scheduler_commands': custom_scheduler_commands})
-    # return dict={'code@computer': , 'tot_num_mpiprocs': ,'max_wallclock_seconds': ,'queue_name': ,
-    # 'custom_scheduler_commands': }
+    restrict_machine.update(
+        {'custom_scheduler_commands': custom_scheduler_commands})
+    # return dict={'code@computer': , 'tot_num_mpiprocs': ,
+    # 'max_wallclock_seconds': ,'queue_name': ,'custom_scheduler_commands': }
     return restrict_machine
 
 
@@ -319,13 +369,15 @@ def check_config_machine(config=None, machine=None, uniform_func=None):
     Args:
         config (dict): input base config
         machine (dict): input machine
-        uniform_func (Callable[[dict, dict], tuple]): uniform related paras in `parameters` and `restrict_machine`
+        uniform_func (Callable[[dict, dict], tuple]):
+            uniform related paras in `parameters` and `restrict_machine`
 
     Returns:
         (dict, dict)
 
     Todo:
-        check machine for a general situation, considerate all custom situation and use a general `uniform_func`
+        check machine for a general situation,
+        considerate all custom situation and use a general `uniform_func`
 
     """
     # get restrict_machine
@@ -345,38 +397,51 @@ def check_config_machine(config=None, machine=None, uniform_func=None):
 def uniform_neb(config, restrict_machine):
     """Uniform resource related paras in `parameters` and `restrict_machine`
 
-    Will update parameters['MOTION']['BAND']['NPROC_REP'] or restrict_machine['tot_num_mpiprocs']
+    Will update parameters['MOTION']['BAND']['NPROC_REP'] or
+    restrict_machine['tot_num_mpiprocs']
 
     Args:
         config (dict): input parameters
-        restrict_machine (dict): restrict machine, for example, dict after `load_machine`
+        restrict_machine (dict): restrict machine,
+            for example, dict after `load_machine`
 
     Returns:
-        list[bool, bool]: True if changed, False otherwise; first for parameters and second for restrict_machine
+        list[bool, bool]: True if changed, False otherwise;
+            first for parameters and second for restrict_machine
 
     Todo:
-        See also `Todo` in `check_machine`. If there is any similar general method,
+        See also `Todo` in `check_machine`.
+        If there is any similar general method,
         this method can be delete and replaced by it
 
     """
     # warning: if 'NPROC_REP' not set, than it will be setted as procs_per_node
     # set default nproc_rep as procs_per_node
-    procs_per_node = get_procs_per_node_from_code_name(restrict_machine['code@computer'])
-    is_changed = [False, False]  # first for parameters, second for restrict_machine
+    procs_per_node = \
+        get_procs_per_node_from_code_name(restrict_machine['code@computer'])
+    # first for parameters, second for restrict_machine
+    is_changed = [False, False]
     if config['MOTION']['BAND'].get('NPROC_REP'):
         nproc_rep = config['MOTION']['BAND']['NPROC_REP']
     else:
-        nproc_rep = config['MOTION']['BAND'].setdefault('NPROC_REP', procs_per_node)
+        nproc_rep = config['MOTION']['BAND'].setdefault('NPROC_REP',
+                                                        procs_per_node)
         is_changed[0] = True
-        warn(f'Cause you have not set `/MOTION/BAND/NPROC_REP`, so it is setted as {nproc_rep}', ResourceWarning)
+        warn(f'Cause you have not set `/MOTION/BAND/NPROC_REP`, '
+             f'so it is setted as {nproc_rep}',
+             ResourceWarning)
     # get number_of_replica and tot_num_mpiprocs
     number_of_replica = config['MOTION']['BAND']['NUMBER_OF_REPLICA']
     tot_num_mpiprocs = restrict_machine['tot_num_mpiprocs']
-    # check whether nproc_rep*number_of_replica == 'tot_num_mpiprocs', if not, change tot_num_mpiprocs
+    # check whether nproc_rep*number_of_replica == 'tot_num_mpiprocs',
+    # if not, change tot_num_mpiprocs
     if nproc_rep * number_of_replica != tot_num_mpiprocs:
         restrict_machine['tot_num_mpiprocs'] = nproc_rep * number_of_replica
         is_changed[1] = True
-        warn(f'`/MOTION/BAND/NPROC_REP` ({nproc_rep}) * `/MOTION/BAND/NUMBER_OF_REPLICA` ({number_of_replica}) '
+        warn(f'`/MOTION/BAND/NPROC_REP` ({nproc_rep}) * '
+             f'`/MOTION/BAND/NUMBER_OF_REPLICA` ({number_of_replica}) '
              f'does not correspond to `nnode` or `nprocs`, '
-             f'so `tot_num_mpiprocs` is setted as {nproc_rep * number_of_replica}', ResourceWarning)
+             f'so `tot_num_mpiprocs` is setted as '
+             f'{nproc_rep * number_of_replica}',
+             ResourceWarning)
     return is_changed

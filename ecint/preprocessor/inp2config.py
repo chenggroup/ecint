@@ -61,10 +61,12 @@ class Cp2kInp(object):
             force_eval = force_eval[0]
         try:
             kind_section_list = force_eval["SUBSYS"]["KIND"]
-            kind_section_dict = {kind_section.pop('_'): kind_section for kind_section in kind_section_list}
+            kind_section_dict = {kind_section.pop('_'): kind_section for
+                                 kind_section in kind_section_list}
             return kind_section_dict
         except KeyError:
-            warn('No &KIND info found, so kind section will not be parsed', Warning)
+            warn('No &KIND info found, so kind section will not be parsed',
+                 Warning)
 
     def get_tree(self):
         return self.get_tree_from_lines(self.well_defined_lines)
@@ -79,9 +81,11 @@ class Cp2kInp(object):
                 name = line.split(None, 1)[0][1:].upper()
                 cls._parse_section_start(line, tree)
                 if isinstance(tree[name], dict):
-                    tree[name].update(cls.get_tree_from_lines(well_defined_lines))
+                    tree[name].update(
+                        cls.get_tree_from_lines(well_defined_lines))
                 elif isinstance(tree[name], list):
-                    tree[name][-1].update(cls.get_tree_from_lines(well_defined_lines))
+                    tree[name][-1].update(
+                        cls.get_tree_from_lines(well_defined_lines))
             else:
                 cls._parse_keyword(line, tree)
         return tree
@@ -193,7 +197,8 @@ class Cp2kInp(object):
 @click.argument('filename', type=click.Path(exists=True))
 @click.argument('config_name', default='ecint.json', type=click.Path())
 @click.option('--format', '-f', 'fm', help='output config format')
-@click.option('--kind', '-k', 'kind_section', type=click.Path(), help='output kind section name')
+@click.option('--kind', '-k', 'kind_section', type=click.Path(),
+              help='output kind section name')
 def inp2config(filename, config_name, fm, kind_section):
     cp2k_inp = Cp2kInp(filename)
     yml = yaml.YAML()
@@ -205,7 +210,8 @@ def inp2config(filename, config_name, fm, kind_section):
         elif fm == 'yaml' or config_name.endswith('.yaml'):
             yml.dump(config_tree, f)
         else:
-            raise ValueError('Unknown config file type, please use `.json` or `.yaml`')
+            raise ValueError('Unknown config file type, '
+                             'please use `.json` or `.yaml`')
     kind_tree = cp2k_inp.extract_kind_section()
     if kind_section and kind_tree:
         with open(kind_section, 'w') as f:
@@ -214,4 +220,5 @@ def inp2config(filename, config_name, fm, kind_section):
             elif kind_section.endswith('.yaml'):
                 yml.dump(kind_tree, f)
             else:
-                raise ValueError('Unknown kind section file type, please use `.json` or `.yaml`')
+                raise ValueError('Unknown kind section file type, '
+                                 'please use `.json` or `.yaml`')

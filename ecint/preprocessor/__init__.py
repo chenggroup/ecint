@@ -17,9 +17,11 @@ class Preprocessor(metaclass=ABCMeta):
         """
         
         Args:
-            inpclass (ecint.preprocessor.input.BaseInput): input class in ecint.preprocessor.input
-            restrict_machine (dict): restrict machine,
-                            assign which code need be used and how many calculation resources are required
+            inpclass (ecint.preprocessor.input.BaseInput):
+                input class in ecint.preprocessor.input
+            restrict_machine (dict):
+                restrict machine, assign which code need be used and
+                how many calculation resources are required
             
         """
         self.structure = inpclass.structure
@@ -40,7 +42,8 @@ class Preprocessor(metaclass=ABCMeta):
 
 
 class Cp2kPreprocessor(Preprocessor):
-    # TODO: make general Preprocessor for another job scheduler, now just for LSF
+    # TODO: make general Preprocessor for another job scheduler,
+    #  now just for LSF
     @property
     def builder(self):
         _builder = Cp2kBaseWorkChain.get_builder()
@@ -48,21 +51,21 @@ class Cp2kPreprocessor(Preprocessor):
             _builder.cp2k.structure = self.structure
         elif isinstance(self.structure, Atoms):
             _builder.cp2k.structure = StructureData(ase=self.structure)
-        _builder.cp2k.parameters = self.parameters
-        _builder.cp2k.code = Code.get_from_string(
-            self.machine.get('code@computer'))
-        _builder.cp2k.metadata.options.resources = {
-            'tot_num_mpiprocs': self.machine.get('tot_num_mpiprocs')}
+        _builder.cp2k.parameters = \
+            self.parameters
+        _builder.cp2k.code = \
+            Code.get_from_string(self.machine.get('code@computer'))
+        _builder.cp2k.metadata.options.resources = \
+            {'tot_num_mpiprocs': self.machine.get('tot_num_mpiprocs')}
         if self.machine.get('max_wallclock_seconds'):
-            _builder.cp2k.metadata.options.max_wallclock_seconds = self.machine.get(
-                'max_wallclock_seconds')
+            _builder.cp2k.metadata.options.max_wallclock_seconds = \
+                self.machine.get('max_wallclock_seconds')
         if self.machine.get('queue_name'):
-            _builder.cp2k.metadata.options.queue_name = self.machine.get(
-                'queue_name')
+            _builder.cp2k.metadata.options.queue_name = \
+                self.machine.get('queue_name')
         if self.machine.get('custom_scheduler_commands'):
-            _builder.cp2k.metadata.options.custom_scheduler_commands = self.machine.get(
-                'custom_scheduler_commands')
-        # _builder.cp2k.metadata.dry_run = True
+            _builder.cp2k.metadata.options.custom_scheduler_commands = \
+                self.machine.get('custom_scheduler_commands')
         return _builder
 
 
@@ -70,7 +73,8 @@ class EnergyPreprocessor(Cp2kPreprocessor):
     @property
     def builder(self):
         builder = super(EnergyPreprocessor, self).builder
-        builder.cp2k.settings = Dict(dict={'additional_retrieve_list': ["*.cube", "*.pdos"]})
+        builder.cp2k.settings = Dict(
+            dict={'additional_retrieve_list': ["*.cube", "*.pdos"]})
         return builder
 
 
@@ -78,7 +82,8 @@ class GeooptPreprocessor(Cp2kPreprocessor):
     @property
     def builder(self):
         builder = super(GeooptPreprocessor, self).builder
-        builder.cp2k.settings = Dict(dict={'additional_retrieve_list': ["*-pos-1.xyz"]})
+        builder.cp2k.settings = Dict(
+            dict={'additional_retrieve_list': ["*-pos-1.xyz"]})
         return builder
 
 
@@ -86,7 +91,8 @@ class NebPreprocessor(Cp2kPreprocessor):
     @property
     def builder(self):
         builder = super(NebPreprocessor, self).builder
-        builder.cp2k.settings = Dict(dict={'additional_retrieve_list': ["*-pos-Replica_nr_?-1.xyz"]})
+        builder.cp2k.settings = Dict(
+            dict={'additional_retrieve_list': ["*-pos-Replica_nr_?-1.xyz"]})
         # uniform_neb(self.parameters.attributes, self.machine)
         return builder
 
@@ -95,6 +101,7 @@ class FrequencyPreprocessor(Cp2kPreprocessor):
     @property
     def builder(self):
         builder = super(FrequencyPreprocessor, self).builder
-        # builder.settings = Dict(dict={'additional_retrieve_list': ["aiida.out"]})
+        # builder.settings = \
+        #     Dict(dict={'additional_retrieve_list': ["aiida.out"]})
         # aiida.out is already in retrieve_list
         return builder

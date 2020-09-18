@@ -18,33 +18,65 @@ MAX_ENERGY_NAME = f'max_energy_structure.xyz'
 
 def get_last_frame(traj_file=TRAJ_NAME, format='xyz', cell=None, pbc=None):
     """
-    :param traj_file: file or filelike
-    :return: atoms
+
+    Args:
+        traj_file (str): file or filelike obj
+        format (str): supported format of `ase`
+        cell (list): cell of `ase`
+        pbc (bool or List[bool]): pbc of `ase`
+
+    Returns:
+        ase.Atoms: last frame of input traj_file
+
     """
+
     last_frame = read(traj_file, index='-1', format=format)
     last_frame.set_cell(cell)
     last_frame.set_pbc(pbc)
     return last_frame
 
 
-def get_traj_for_energy_curve(replica_traj_list, write_name=REPLICA_NAME):
+def get_traj_for_energy_path(replica_traj_list, write_name=REPLICA_NAME):
+    """Could generate a trajectory file
+
+    Args:
+        replica_traj_list (list): atoms list (trajectory) or file/filelike list
+        write_name (str): name of output trajectory file,
+            if do not want to write output file, set write_name=None or ''
+
+    Returns:
+        ase.Atoms: trajectory of energy path
+
     """
-    :param replica_traj_list: atoms list (traj list) or file/filelike list
-    :param write_name:
-    do not write output file, set write_name=None or ''
-    """
+
     if isinstance(replica_traj_list[0], str):
-        traj_for_energy_curve = [get_last_frame(replica_traj_file) for replica_traj_file in replica_traj_list]
+        traj_for_energy_path = [get_last_frame(replica_traj_file) for
+                                replica_traj_file in replica_traj_list]
     elif isinstance(replica_traj_list[0], Atoms):
-        traj_for_energy_curve = [replica_traj for replica_traj in replica_traj_list]
+        traj_for_energy_path = [replica_traj for replica_traj in
+                                replica_traj_list]
     else:
-        raise ValueError('`replica_traj_list` need be list of atoms or file/filelike')
+        raise ValueError('`replica_traj_list` need be '
+                         'list of atoms or file/filelike')
     if write_name:
-        write(write_name, traj_for_energy_curve)
-    return traj_for_energy_curve
+        write(write_name, traj_for_energy_path)
+    return traj_for_energy_path
 
 
-def get_max_energy_frame(traj_file=REPLICA_NAME, write_name=MAX_ENERGY_NAME, cell=None, pbc=False):
+def get_max_energy_frame(traj_file=REPLICA_NAME, write_name=MAX_ENERGY_NAME,
+                         cell=None, pbc=False):
+    """Could generate a structure file
+
+    Args:
+        traj_file (str): structure file with many frames
+        write_name (str): name of the max frame file,
+            if do not want to write output file, set write_name=None or ''
+        cell (list): cell of `ase`
+        pbc (bool, List[bool]): pbc of `ase`
+
+    Returns:
+
+    """
     traj = read(traj_file, index=':')
     energy_list = np.array([atoms.info['E'] for atoms in traj])
     atoms_max_energy = traj[energy_list.argmax()]
@@ -103,8 +135,9 @@ def notification_in_dingtalk(webhook, node):
 
     Args:
         webhook (str): url webhook of dingtalk robot
-        node (aiida.orm.ProcessNode): object returned by running or submitting workchain,
-                                      at ecint WorkChain or SingleWorkChain level
+        node (aiida.orm.ProcessNode):
+            object returned by running or submitting workchain,
+            at ecint WorkChain or SingleWorkChain level
 
     Returns:
         dict: response information after post
@@ -112,7 +145,9 @@ def notification_in_dingtalk(webhook, node):
     """
     headers = {'Content-Type': 'application/json'}
     title = 'Job Info'
-    structure = getattr(node.inputs, next(filter(lambda x: re.match(r'structure.*', x), dir(node.inputs))))
+    structure = getattr(node.inputs,
+                        next(filter(lambda x: re.match(r'structure.*', x),
+                                    dir(node.inputs))))
     text = '## Job Info\n'
     text += 'Your job is over!\n'
     text += '>\n'
@@ -124,16 +159,22 @@ def notification_in_dingtalk(webhook, node):
     text += '>\n'
     text += f'> Job State: **{node.process_state.name}**\n'
     data = {'msgtype': 'markdown', 'markdown': {'title': title, 'text': text}}
-    response = requests.post(url=webhook, headers=headers, data=json.dumps(data))
+    response = requests.post(url=webhook, headers=headers,
+                             data=json.dumps(data))
     return response
 
 
 def get_convergence_info_of_band(band_file):
+    """Check if BAND.out is convergent
+
+    Args:
+        band_file (str): name of band file
+
+    Returns:
+        dict: convergence information of band
+
     """
-    check if BAND.out is convergent
-    :param band_file:
-    :return:
-    """
+
     with open(band_file) as f:
         band_info = f.read()
     rms_displacement = re.findall(r'RMS DISPLACEMENT.*', band_info)
@@ -142,7 +183,8 @@ def get_convergence_info_of_band(band_file):
     max_force = re.findall(r'MAX FORCE', band_info)
 
     def get_convergence_info_list(convergence_key):
-        return [parse_band_convergence_like_info(info) for info in convergence_key]
+        return [parse_band_convergence_like_info(info) for info in
+                convergence_key]
 
     band_convergence_info = {
         'rms_displacement': get_convergence_info_list(rms_displacement),
