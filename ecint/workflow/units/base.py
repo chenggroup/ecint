@@ -355,3 +355,23 @@ class FrequencySingleWorkChain(BaseSingleWorkChain):
             f.write(f'# Step: Frequency, '
                     f'PK: {self.ctx.frequency_workchain.pk}\n')
             f.write(f'frequency file: {output_frequency_name}')
+
+
+class DeepmdSingleWorkChain(BaseSingleWorkChain):
+    @classmethod
+    def define(cls, spec):
+        super(DeepmdSingleWorkChain, cls).define(spec)
+        spec.input('datadirs', valid_type=list, required=True)
+        # TODO: delete following
+        spec.input(
+            'train_param',
+            valid_type=dict,
+            default=load_default_config('train.json'),
+            required=False
+        )
+        spec.input(
+            'machine',
+            valid_type=list,
+            # TODO: impelment default dpmd gpu machine
+            default=default_dpmd_gpu_machine
+        )

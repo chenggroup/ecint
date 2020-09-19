@@ -15,6 +15,8 @@ from ruamel import yaml
 from ecint.config import default_cp2k_machine
 from ecint.preprocessor.kind import KindSection
 
+from scipy.optimize import curve_fit
+
 
 def load_json(json_path):
     with open(json_path) as f:
@@ -445,3 +447,24 @@ def uniform_neb(config, restrict_machine):
              f'{nproc_rep * number_of_replica}',
              ResourceWarning)
     return is_changed
+
+def birch_murnaghan_equation(V, V0, E0, B0, B0_prime):
+    V_ratio = np.power(np.divide(V0, V), np.divide(2, 3))
+    E = E0 + np.divide((9 * V0 * B0), 16) * (np.power(V_ratio - 1, 3) * B0_prime
+            + np.power((V_ratio -1), 2) * (6 - 4 * V_ratio))
+    return E
+
+
+def fit_cell_bme(v_list, e_list):
+    """
+    :param v_list:
+    :param e_list:
+    :return: the fit parapmeter
+    """
+    popt, pcov = curve_fit(
+        birch_murnaghan_equation,
+        v_list,
+        e_list,
+        [v_list[0], e_list[0], 2, 2]
+    )
+    return popt, pcov

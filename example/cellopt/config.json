@@ -1,0 +1,53 @@
+{
+  "FORCE_EVAL": {
+    "METHOD": "Quickstep",
+    "DFT": {
+      "BASIS_SET_FILE_NAME": "BASIS_MOLOPT",
+      "POTENTIAL_FILE_NAME": "GTH_POTENTIALS",
+      "QS": {
+        "EPS_DEFAULT": 1e-13
+      },
+      "SCF": {
+        "SCF_GUESS": "RESTART",
+        "EPS_SCF": 5e-7,
+        "MAX_SCF": 100,
+        "DIAGONALIZATION": {
+          "ALGORITHM": "STANDARD"
+        },
+        "MIXING": {
+          "METHOD": "BROYDEN_MIXING",
+          "ALPHA": 0.2,
+          "BETA": 1.5,
+          "NBROYDEN": 10
+        },
+        "PRINT": {
+          "RESTART": {
+            "EACH": {
+              "QS_SCF": 50
+            },
+            "ADD_LAST": "NUMERIC"
+          }
+        }
+      },
+      "MGRID": {
+        "CUTOFF": 400
+      },
+      "KPOINTS": {
+        "SCHEME": "MONKHORST-PACK 6 6 10"
+      },
+      "XC": {
+        "XC_FUNCTIONAL": {
+          "_": "PBE"
+        },
+        "VDW_POTENTIAL": {
+          "DISPERSION_FUNCTIONAL": "PAIR_POTENTIAL",
+          "PAIR_POTENTIAL": {
+            "TYPE": "DFTD3",
+            "PARAMETER_FILE_NAME": "dftd3.dat",
+            "REFERENCE_FUNCTIONAL": "PBE"
+          }
+        }
+      }
+    }
+  }
+}
