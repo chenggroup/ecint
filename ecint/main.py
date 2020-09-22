@@ -1,5 +1,6 @@
 import importlib
 import os
+from abc import ABCMeta, abstractmethod
 from dataclasses import asdict, dataclass, field
 from warnings import warn
 
@@ -26,20 +27,38 @@ class SubData(object):
 
 
 @dataclass
-class UserInput(object):
+class BaseUserInput(object, metaclass=ABCMeta):
     workflow: str
     webhook: str = None
     resdir: str = field(default=os.getcwd())
+    # metadata: SubData and other special paras
+    metadata: dict = field(default_factory=dict)
+    # subdata: {str: SubData(config, kind_section, machine), ...}
+    subdata: dict = field(default_factory=dict)
+
+    @abstractmethod
+    def get_workflow_inp(self):
+        pass
+
+
+@dataclass
+class DpUserInput(BaseUserInput):
+    datadirs: list = None
+
+    def get_workflow_inp(self):
+        workflow_inp = {'datadirs': self.datadirs,
+                        **load_input(asdict(self), resdir=self.resdir)}
+        return workflow_inp
+
+
+@dataclass
+class SmUserInput(BaseUserInput):
     # structure section
     # if set, high-throughput calc will run, conflicting with `structure`
     structures_folder: str = None
     structure: str or list = None
     cell: list = field(default_factory=list)
     pbc: bool or list = True
-    # metadata: SubData and other special paras
-    metadata: dict = field(default_factory=dict)
-    # subdata: {str: SubData(config, kind_section, machine), ...}
-    subdata: dict = field(default_factory=dict)
 
     @property
     def has_structures_folder(self):
@@ -61,12 +80,13 @@ class UserInput(object):
                         structure_dir = os.path.join(self.structures_folder,
                                                      structure_file)
                         resdir = os.path.join(self.resdir, str(i))
-                        workflow_inp.append({'structure':
-                                                 load_structure(structure_dir,
-                                                                self.cell,
-                                                                self.pbc),
-                                             **load_input(asdict(self),
-                                                          resdir=resdir)})
+                        workflow_inp.append(
+                            {'structure': load_structure(structure_dir,
+                                                         self.cell,
+                                                         self.pbc),
+                             **load_input(asdict(self),
+                                          resdir=resdir)}
+                        )
                     except UnknownFileTypeError as te:
                         warn(f'{structure_file}: {str(te)}', Warning)
             else:
@@ -75,6 +95,15 @@ class UserInput(object):
             workflow_inp = {**load_s(asdict(self)),
                             **load_input(asdict(self), resdir=self.resdir)}
         return workflow_inp
+
+
+def create_userinput(workflow_name):
+    workflow = load_workflow(workflow_name)
+    workflow_type = workflow.TYPE
+    if workflow_type == 'simulation':
+        return SmUserInput
+    elif workflow_type == 'deepmd':
+        return DpUserInput
 
 
 def load_workflow(workflow_name):
@@ -148,8 +177,8 @@ def load_input(user_input, resdir):
         subdata = user_input.pop('subdata')
         for submeta, subinfo in subdata.items():
             if submeta not in workflow.SUB:
-                raise KeyError(
-                    f'Unknown {submeta} in {user_input.get("workflow")}')
+                raise KeyError(f'Unknown {submeta} '
+                               f'in {user_input.get("workflow")}')
             else:
                 workflow_inp[submeta].update(**_load_subdata(subinfo))
     # check structure
@@ -250,7 +279,8 @@ def _submit_ecint(resdir, webhook, workflow, workflow_inp):
         webhook (str): webhook for notification
         workflow (str): workflow name
         workflow_inp (dict): workflow input,
-        e.g. {'structure':, 'resdir':, 'config':, 'kind_section':, 'machine':}
+            e.g. {'structure':, 'resdir':, 'config':,
+                  'kind_section':, 'machine':}
 
     Returns:
         None
@@ -262,7 +292,7 @@ def _submit_ecint(resdir, webhook, workflow, workflow_inp):
     # store all StructureData before submit
     if workflow_inp.get('structure'):
         workflow_inp['structure'].store()
-    else:  # userinput.get_workflow_inp().get('structures')
+    elif workflow_inp.get('structures'):
         for structure_data in workflow_inp['structures'].values():
             structure_data.store()
     node = submit(Ecint, **{'webhook': webhook,
@@ -286,6 +316,7 @@ def submit_from_file(input_file):
     ecint_input = (load_json(input_file)
                    if input_file.endswith('.json')
                    else load_yaml(input_file))
+    UserInput = create_userinput(ecint_input['workflow'])
     userinput = UserInput(**ecint_input)
     # check webhook
     webhook = userinput.webhook
