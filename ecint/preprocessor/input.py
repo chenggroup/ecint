@@ -10,7 +10,29 @@ from ecint.preprocessor.utils import load_config, update_dict
 from ecint.workflow.units import CONFIG_DIR
 
 __all__ = ['EnergyInputSets', 'GeooptInputSets', 'NebInputSets',
-           'FrequencyInputSets']
+           'FrequencyInputSets', 'DeepmdInputSets']
+
+
+def make_tag_config(init_config, typemap):
+    """
+
+    Args:
+        init_config (str or dict):
+        typemap (dict): typemap for switching default config inputs
+
+    Returns:
+        dict: dict type config
+
+    """
+    if isinstance(init_config, str):
+        config_path = os.path.join(CONFIG_DIR, typemap[init_config])
+        _config = load_config(config_path)
+    elif isinstance(init_config, dict):
+        _config = init_config
+    else:
+        raise TypeError(f'Config should be dict '
+                        f'or use config file under {CONFIG_DIR}')
+    return _config
 
 
 class BaseInput(metaclass=ABCMeta):
@@ -65,18 +87,8 @@ class BaseInput(metaclass=ABCMeta):
         """
         pass
 
-    @abstractmethod
-    def generate_cp2k_input(self):
-        """
 
-        Returns:
-            str: use input_sets to generate cp2k input
-
-        """
-        pass
-
-
-class InputSets(BaseInput):
+class Cp2kInputSets(object):
     # TODO: update dict with pbc in xyz, xy, yz, or zx
     def __init__(self, structure, config, kind_section):
         """
@@ -112,7 +124,7 @@ class InputSets(BaseInput):
             if (self._kind_section.structure is not None) and (
                     self._kind_section.structure != self.structure):
                 warn('You have set structure in KindSection, this structure '
-                     'will be replaced by structure in InputSets',
+                     'will be replaced by structure in Cp2kInputSets',
                      UserWarning)
             self._kind_section.load_structure(self.structure)
             kind_section_list = self._kind_section.kind_section
@@ -191,7 +203,7 @@ class InputSets(BaseInput):
         return inp.render()
 
 
-class UnitsInputSets(InputSets):
+class UnitsInputSets(Cp2kInputSets):
     """
 
     Args:
@@ -204,16 +216,8 @@ class UnitsInputSets(InputSets):
 
     @property
     def config(self):
-        if isinstance(self._config, str):
-            units_config_path = os.path.join(CONFIG_DIR,
-                                             self.TypeMap[self._config])
-            units_config = load_config(units_config_path)
-        elif isinstance(self._config, dict):
-            units_config = self._config
-        else:
-            raise TypeError(f'Units config should use config file under '
-                            f'{CONFIG_DIR}')
-        return units_config
+        _config = make_tag_config(self._config, self.TypeMap)
+        return _config
 
 
 class EnergyInputSets(UnitsInputSets):
@@ -252,3 +256,28 @@ class FrequencyInputSets(UnitsInputSets):
                                                  kind_section)
         self.add_config({"GLOBAL": {"RUN_TYPE": "VIBRATIONAL_ANALYSIS",
                                     "PRINT_LEVEL": "MEDIUM"}})
+
+
+class DeepmdInputSets(object):
+    """
+    for deepmd
+    """
+    TypeMap = {'default': 'dpmd.json'}
+
+    def __init__(self, datadirs, config='test'):
+        self._datadirs = datadirs
+        self._config = config
+
+    @property
+    def datadirs(self):
+        return self._datadirs
+
+    @property
+    def config(self):
+        _config = make_tag_config(self._config, self.TypeMap)
+        return _config
+
+    @property
+    def input_sets(self):
+        _input_sets = deepcopy(self.config)
+        return _input_sets

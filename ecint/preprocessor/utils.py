@@ -291,14 +291,15 @@ def load_machine(machine):
     else:
         restrict_machine.update({'code@computer': _machine['code@computer']})
     # set `nprocs`
-    procs_per_node = get_procs_per_node_from_code_name(
-        _machine['code@computer'])
+    procs_per_node = \
+        get_procs_per_node_from_code_name(_machine['code@computer'])
     if 'nnode' in _machine:
         nprocs = _machine['nnode'] * procs_per_node
         if ('nprocs' in _machine) or ('n' in _machine):
             warn('You have set both `nnode` and `nprocs`(`n`), '
                  'and the value of `nprocs`(`n`) will be ignored',
                  Warning)
+    # TODO: make more specific for Slurm
     elif (('nprocs' in _machine) or ('n' in _machine) or
           ('tot_num_mpiprocs' in _machine)):
         nprocs = (_machine.get('nprocs') or _machine.get('n') or
@@ -327,12 +328,19 @@ def load_machine(machine):
         queue = (_machine.get('queue') or _machine.get('queue_name')
                  or _machine.get('q'))
         restrict_machine.update({'queue_name': queue})
+    # set custom_scheduler_commands
     # set `ptile`
     if 'ptile' in _machine:
         ptile = _machine.get('ptile')
+        custom_scheduler_commands = f'#BSUB -R \"span[ptile={ptile}]\"'
+    elif 'ngpu' in _machine:
+        num_gpu = _machine.get('ngpu')
+        custom_scheduler_commands = f'#SBATCH --gres=gpu:{num_gpu}'
+    elif 'custom_scheduler_commands' in _machine:
+        custom_scheduler_commands = _machine.get('custom_scheduler_commands')
     else:
         ptile = procs_per_node
-    custom_scheduler_commands = f'#BSUB -R \"span[ptile={ptile}]\"'
+        custom_scheduler_commands = f'#BSUB -R \"span[ptile={ptile}]\"'
     restrict_machine.update(
         {'custom_scheduler_commands': custom_scheduler_commands})
     # return dict={'code@computer': , 'tot_num_mpiprocs': ,

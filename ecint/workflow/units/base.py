@@ -3,10 +3,10 @@ import re
 
 import numpy as np
 from aiida.engine import WorkChain
-from aiida.orm import Float, List, StructureData, TrajectoryData
+from aiida.orm import Float, List, SinglefileData, StructureData, TrajectoryData
 
 from ecint.config import default_cp2k_large_machine, default_cp2k_machine, \
-    RESULT_NAME
+    default_dpmd_gpu_machine, RESULT_NAME
 from ecint.postprocessor.utils import AU2EV, get_last_frame, \
     write_xyz_from_structure, write_xyz_from_trajectory
 from ecint.postprocessor.visualization import plot_energy_curve
@@ -17,7 +17,8 @@ from ecint.preprocessor.utils import check_config_machine, inspect_node, \
     uniform_neb
 
 __all__ = ['EnergySingleWorkChain', 'GeooptSingleWorkChain',
-           'NebSingleWorkChain', 'FrequencySingleWorkChain']
+           'NebSingleWorkChain', 'FrequencySingleWorkChain',
+           'DeepmdSingleWorkChain']
 
 
 # def load_default_config(config_name):
@@ -25,6 +26,8 @@ __all__ = ['EnergySingleWorkChain', 'GeooptSingleWorkChain',
 
 
 class BaseSingleWorkChain(WorkChain):
+    TYPE = 'simulation'
+
     @classmethod
     def define(cls, spec):
         super(BaseSingleWorkChain, cls).define(spec)

@@ -9,6 +9,7 @@ from ecint.workflow.units.base import FrequencySingleWorkChain, \
 
 class NebWorkChain(WorkChain):
     # SUB corresponds to expose_inputs namespace
+    TYPE = 'simulation'
     SUB = {'geoopt', 'neb', 'frequency'}
 
     @classmethod

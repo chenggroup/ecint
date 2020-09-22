@@ -2,13 +2,14 @@ from abc import ABCMeta, abstractmethod
 
 from aiida.orm import Code, Dict, StructureData
 from aiida_cp2k.workchains import Cp2kBaseWorkChain
+from aiida_deepmd.calculations.dp import DpCalculation
 from ase import Atoms
 
 from ecint.preprocessor.utils import get_procs_per_node_from_code_name, \
     load_machine, uniform_neb
 
 __all__ = ['EnergyPreprocessor', 'GeooptPreprocessor', 'NebPreprocessor',
-           'FrequencyPreprocessor']
+           'FrequencyPreprocessor', 'DeepmdPreprocessor']
 
 
 class Preprocessor(metaclass=ABCMeta):
@@ -17,14 +18,15 @@ class Preprocessor(metaclass=ABCMeta):
         """
         
         Args:
-            inpclass (ecint.preprocessor.input.BaseInput):
+            TODO: add ecint.preprocessor.input.BaseInput
+            inpclass (Any):
                 input class in ecint.preprocessor.input
             restrict_machine (dict):
                 restrict machine, assign which code need be used and
                 how many calculation resources are required
             
         """
-        self.structure = inpclass.structure
+        # self.structure = inpclass.structure
         self.parameters = Dict(dict=inpclass.input_sets)
         self.machine = restrict_machine
 
@@ -44,6 +46,10 @@ class Preprocessor(metaclass=ABCMeta):
 class Cp2kPreprocessor(Preprocessor):
     # TODO: make general Preprocessor for another job scheduler,
     #  now just for LSF
+    def __init__(self, inpclass, restrict_machine=None):
+        super(Cp2kPreprocessor, self).__init__(inpclass, restrict_machine)
+        self.structure = inpclass.structure
+
     @property
     def builder(self):
         _builder = Cp2kBaseWorkChain.get_builder()
@@ -65,6 +71,41 @@ class Cp2kPreprocessor(Preprocessor):
                 self.machine.get('queue_name')
         if self.machine.get('custom_scheduler_commands'):
             _builder.cp2k.metadata.options.custom_scheduler_commands = \
+                self.machine.get('custom_scheduler_commands')
+        return _builder
+
+
+class DeepmdPreprocessor(Preprocessor):
+    def __init__(self, inpclass, restrict_machine=None):
+        super(DeepmdPreprocessor, self).__init__(inpclass, restrict_machine)
+        self.datadirs = inpclass.datadirs
+
+    @property
+    def builder(self):
+        _builder = DpCalculation.get_builder()
+        if isinstance(self.datadirs, list):
+            _builder.datadirs = self.datadirs
+        # place the input parameters
+        _builder.loss = Dict(dict=self.parameters['loss'])
+        _builder.training = Dict(dict=self.parameters['training'])
+        _builder.learning_rate = Dict(dict=self.parameters['learning_rate'])
+        _builder.model = Dict(dict=self.parameters['model'])
+
+        # machine information
+        _builder.code = \
+            Code.get_from_string(self.machine.get('code@computer'))
+        _builder.metadata.options.resources = {
+            'num_machines': 1,
+            'tot_num_mpiprocs': self.machine.get('tot_num_mpiprocs')
+        }
+        if self.machine.get('max_wallclock_seconds'):
+            _builder.metadata.options.max_wallclock_seconds = \
+                self.machine.get('max_wallclock_seconds')
+        if self.machine.get('queue_name'):
+            _builder.metadata.options.queue_name = \
+                self.machine.get('queue_name')
+        if self.machine.get('custom_scheduler_commands'):
+            _builder.metadata.options.custom_scheduler_commands = \
                 self.machine.get('custom_scheduler_commands')
         return _builder
 
