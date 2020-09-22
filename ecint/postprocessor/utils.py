@@ -145,15 +145,21 @@ def notification_in_dingtalk(webhook, node):
     """
     headers = {'Content-Type': 'application/json'}
     title = 'Job Info'
-    structure = getattr(node.inputs,
-                        next(filter(lambda x: re.match(r'structure.*', x),
-                                    dir(node.inputs))))
+    # get structure
+    structure = None
+    try:
+        structure = getattr(node.inputs,
+                            next(filter(lambda x: re.match(r'structure.*', x),
+                                        dir(node.inputs))))
+    except StopIteration:
+        pass
     text = '## Job Info\n'
     text += 'Your job is over!\n'
     text += '>\n'
     text += f'> Job PK: **{node.pk}**\n'
     text += '>\n'
-    text += f'> Job Chemical Formula: **{structure.get_formula()}**\n'
+    if structure:
+        text += f'> Job Chemical Formula: **{structure.get_formula()}**\n'
     text += '>\n'
     text += f'> Job Type: **{node.process_label}**\n'
     text += '>\n'
