@@ -358,3 +358,54 @@ class FrequencySingleWorkChain(BaseSingleWorkChain):
             f.write(f'# Step: Frequency, '
                     f'PK: {self.ctx.frequency_workchain.pk}\n')
             f.write(f'frequency file: {output_frequency_name}')
+
+
+class DeepmdSingleWorkChain(BaseSingleWorkChain):
+    TYPE = 'deepmd'
+
+    @classmethod
+    def define(cls, spec):
+        super(DeepmdSingleWorkChain, cls).define(spec)
+        spec.input('datadirs', valid_type=list, required=True, non_db=True)
+        spec.input(
+            'machine',
+            default=default_dpmd_gpu_machine,
+            valid_type=dict,
+            required=False,
+            non_db=True
+        )
+
+        spec.outline(
+            cls.check_config_machine,
+            cls.submit_dpmd,
+            cls.inspect_dpmd,
+            cls.get_pb,
+            cls.write_results
+        )
+
+        spec.output('model.pb', valid_type=SinglefileData)
+
+    def submit_dpmd(self):
+        inp = DeepmdInputSets(
+            datadirs=self.inputs.datadirs,
+            config=self.ctx.config
+        )
+        pre = DeepmdPreprocessor(inp, self.ctx.machine)
+        builder = pre.builder
+        node = self.submit(builder)
+        self.to_context(dpmd_workchain=node)
+
+    def inspect_dpmd(self):
+        inspect_node(self.ctx.dpmd_workchain)
+
+    def get_pb(self):
+        model = (self.ctx.dpmd_workchain.outputs.
+                 retrieved.open('model.pb', mode='rb'))
+        self.ctx.model = SinglefileData(file=model)
+        self.out('model.pb', self.ctx.model.store())
+
+    def write_results(self):
+        os.chdir(self.inputs.resdir)
+        with open(RESULT_NAME, 'a') as f:
+            f.write(f'# Step: Deepmd Training, '
+                    f'PK: {self.ctx.dpmd_workchain.pk}\n')

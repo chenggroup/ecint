@@ -10,13 +10,13 @@
         "ELEMENT": "Fe",
         "BASIS_SET": "DZVP-MOLOPT-SR-GTH",
         "POTENTIAL": "GTH-PBE",
-        "BS":{
-          "BETA":{
+        "BS": {
+          "BETA": {
             "N": "4 3",
             "NEL": "-2 -6",
             "L": "0 2"
           },
-          "ALPHA":{
+          "ALPHA": {
             "N": "4 3",
             "NEL": "-2 +4",
             "L": "0 2"
@@ -27,13 +27,13 @@
         "ELEMENT": "Fe",
         "BASIS_SET": "DZVP-MOLOPT-SR-GTH",
         "POTENTIAL": "GTH-PBE",
-        "BS":{
-          "ALPHA":{
+        "BS": {
+          "ALPHA": {
             "N": "4 3",
             "NEL": "-2 -6",
             "L": "0 2"
           },
-          "BETA":{
+          "BETA": {
             "N": "4 3",
             "NEL": "-2 +4",
             "L": "0 2"

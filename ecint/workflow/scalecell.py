@@ -1,20 +1,23 @@
+import os
+
 import numpy as np
 from aiida.engine import WorkChain
 from aiida.orm import StructureData
 
+from ecint.config import RESULT_NAME
 from ecint.preprocessor.utils import check_config_machine, inspect_node
 from ecint.workflow.units.base import EnergySingleWorkChain
 
 
-class CellOptWorkChain(WorkChain):
+class CelloptWorkChain(WorkChain):
     """
     Workflow to cell optimization
     """
-    SUB = {'energy'}  # correspond to expose_inputs namespace
+    SUB = {'enercalc'}  # correspond to expose_inputs namespace
 
     @classmethod
     def define(cls, spec):
-        super(CellOptWorkChain, cls).define(spec)
+        super(CelloptWorkChain, cls).define(spec)
 
         spec.input('structure', valid_type=StructureData, required=True)
 
@@ -27,7 +30,8 @@ class CellOptWorkChain(WorkChain):
         spec.outline(
             cls.check_config_machine,
             cls.submit_cellopt,
-            cls.inspect_cell_opt,
+            cls.inspect_cellopt,
+            cls.write_results
         )
 
     def check_config_machine(self):
@@ -56,7 +60,7 @@ class CellOptWorkChain(WorkChain):
             node = self.submit(
                 EnergySingleWorkChain,
                 structure=tmp_struct_data,
-                label='scale {0}'.format(scale),
+                label=f'scale_{scale:.3f}',
                 **self.exposed_inputs(EnergySingleWorkChain,
                                       namespace='enercalc')
             )
@@ -65,3 +69,22 @@ class CellOptWorkChain(WorkChain):
     def inspect_cellopt(self):
         for i in range(len(self.ctx.scale_list)):
             inspect_node(self.ctx[f'cellopt_{i}'])
+
+    def write_results(self):
+        os.chdir(self.inputs.resdir)
+        with open(RESULT_NAME, 'a') as f:
+            f.write(f'# Scale Factor,  Volume, Energy')
+            for i in range(len(self.ctx.scale_list)):
+                volume = (
+                    self.ctx[f'cellopt_{i}']
+                        .inputs
+                        .structure
+                        .get_cell_volume()
+                )
+                energy = (
+                    self.ctx[f'cellopt_{i}']
+                        .outputs
+                        .energy
+                        .value
+                )
+                f.write(f'{i} {volume} {energy}')
