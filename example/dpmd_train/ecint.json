@@ -1,0 +1,8 @@
+{
+  "workflow": "DeepmdSingleWorkChain",
+  "webhook": "https://oapi.dingtalk.com/robot/send?access_token=xxx",
+  "resdir": "results_json",
+  "datadirs": [
+    "./train_data"
+  ]
+}
