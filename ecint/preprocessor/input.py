@@ -317,10 +317,6 @@ class LammpsInputSets(object):
     def input_sets(self):
         files = {}
         for i, graph in enumerate(self.graphs):
-            with open('test.log', 'w') as f:
-                f.write(os.path.abspath(graph))
-                f.write('\n')
-                f.write(os.getcwd())
             files[f'graph_{i}'] = SinglefileData(file=os.path.abspath(graph))
         variables = self.variables
         variables.update({'GRAPHS': ' '.join([f'{g}.pb' for g in files.keys()]),

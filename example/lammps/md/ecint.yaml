@@ -1,0 +1,14 @@
+workflow: LammpsSingleWorkChain
+webhook: https://oapi.dingtalk.com/robot/send?access_token=a3cd7e35c31f149248a46053f51b11ad843cc50a975730e565cb3f0292f8e56b
+resdir: results_yaml
+structure: Au13O2.xyz
+cell: [15, 15, 15]
+metadata:
+  kinds: ['Au', 'O']
+  graphs: ['graph.000.pb', 'graph.001.pb', 'graph.002.pb', 'graph.003.pb']
+  variables:
+    NSTEPS: 1000
+    THERMO_FREQ: 10
+    DUMP_FREQ: 10
+    TEMP: 323
+    PRES: -1
