@@ -1,8 +1,10 @@
 import os
-from abc import ABCMeta, abstractmethod
 from copy import deepcopy
+from dataclasses import dataclass
 from warnings import warn
 
+import numpy as np
+from aiida.orm import SinglefileData, StructureData
 from aiida_cp2k.utils import Cp2kInput
 
 from ecint.preprocessor.kind import DZVPPBE, KindSection
@@ -10,7 +12,7 @@ from ecint.preprocessor.utils import load_config, update_dict
 from ecint.workflow.units import CONFIG_DIR
 
 __all__ = ['EnergyInputSets', 'GeooptInputSets', 'NebInputSets',
-           'FrequencyInputSets', 'DeepmdInputSets']
+           'FrequencyInputSets', 'DeepmdInputSets', 'LammpsInputSets']
 
 
 def make_tag_config(init_config, typemap):
@@ -35,57 +37,57 @@ def make_tag_config(init_config, typemap):
     return _config
 
 
-class BaseInput(metaclass=ABCMeta):
-    @property
-    @abstractmethod
-    def structure(self):
-        """
-
-        Returns:
-            aiida.orm.StructureData: structure
-
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def config(self):
-        """
-
-        Returns:
-            dict: base config dict
-
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def kind_section(self):
-        """
-
-        Returns:
-            list[dict]:
-                kind section list of dict,
-                e.g. [{'_': 'H',
-                       'BASIS_SET': 'TZV2P-MOLOPT-GTH',
-                       'POTENTIAL': 'GTH-PBE'},
-                      {'_': 'O',
-                       'BASIS_SET': 'TZV2P-MOLOPT-GTH',
-                       'POTENTIAL': 'GTH-PBE'}]
-
-        """
-        pass
-
-    @property
-    @abstractmethod
-    def input_sets(self):
-        """
-
-        Returns:
-            dict: combine structure, config and kind_section to get input_sets
-
-        """
-        pass
+# class BaseInput(metaclass=ABCMeta):
+#     @property
+#     @abstractmethod
+#     def structure(self):
+#         """
+#
+#         Returns:
+#             aiida.orm.StructureData: structure
+#
+#         """
+#         pass
+#
+#     @property
+#     @abstractmethod
+#     def config(self):
+#         """
+#
+#         Returns:
+#             dict: base config dict
+#
+#         """
+#         pass
+#
+#     @property
+#     @abstractmethod
+#     def kind_section(self):
+#         """
+#
+#         Returns:
+#             list[dict]:
+#                 kind section list of dict,
+#                 e.g. [{'_': 'H',
+#                        'BASIS_SET': 'TZV2P-MOLOPT-GTH',
+#                        'POTENTIAL': 'GTH-PBE'},
+#                       {'_': 'O',
+#                        'BASIS_SET': 'TZV2P-MOLOPT-GTH',
+#                        'POTENTIAL': 'GTH-PBE'}]
+#
+#         """
+#         pass
+#
+#     @property
+#     @abstractmethod
+#     def input_sets(self):
+#         """
+#
+#         Returns:
+#             dict: combine structure, config and kind_section to get input_sets
+#
+#         """
+#         pass
 
 
 class Cp2kInputSets(object):
@@ -121,8 +123,8 @@ class Cp2kInputSets(object):
     @property
     def kind_section(self):
         if isinstance(self._kind_section, KindSection):
-            if (self._kind_section.structure is not None) and (
-                    self._kind_section.structure != self.structure):
+            if (self._kind_section.structure is not None) and \
+                    (self._kind_section.structure != self.structure):
                 warn('You have set structure in KindSection, this structure '
                      'will be replaced by structure in Cp2kInputSets',
                      UserWarning)
@@ -233,7 +235,7 @@ class EnergyInputSets(UnitsInputSets):
 class GeooptInputSets(UnitsInputSets):
     TypeMap = {'default': 'geoopt.json'}
 
-    def __init__(self, structure, config='test', kind_section=DZVPPBE()):
+    def __init__(self, structure, config='default', kind_section=DZVPPBE()):
         super(GeooptInputSets, self).__init__(structure, config, kind_section)
         self.add_config({"GLOBAL": {"RUN_TYPE": "GEO_OPT",
                                     "PRINT_LEVEL": "MEDIUM"}})
@@ -242,7 +244,7 @@ class GeooptInputSets(UnitsInputSets):
 class NebInputSets(UnitsInputSets):
     TypeMap = {'default': 'neb.json'}
 
-    def __init__(self, structure, config='test', kind_section=DZVPPBE()):
+    def __init__(self, structure, config='default', kind_section=DZVPPBE()):
         super(NebInputSets, self).__init__(structure, config, kind_section)
         self.add_config({"GLOBAL": {"RUN_TYPE": "BAND",
                                     "PRINT_LEVEL": "MEDIUM"}})
@@ -251,7 +253,7 @@ class NebInputSets(UnitsInputSets):
 class FrequencyInputSets(UnitsInputSets):
     TypeMap = {'default': 'frequency.json'}
 
-    def __init__(self, structure, config='test', kind_section=DZVPPBE()):
+    def __init__(self, structure, config='default', kind_section=DZVPPBE()):
         super(FrequencyInputSets, self).__init__(structure, config,
                                                  kind_section)
         self.add_config({"GLOBAL": {"RUN_TYPE": "VIBRATIONAL_ANALYSIS",
@@ -264,7 +266,7 @@ class DeepmdInputSets(object):
     """
     TypeMap = {'default': 'dpmd.json'}
 
-    def __init__(self, datadirs, config='test'):
+    def __init__(self, datadirs, config='default'):
         self._datadirs = datadirs
         self._config = config
 
@@ -280,4 +282,40 @@ class DeepmdInputSets(object):
     @property
     def input_sets(self):
         _input_sets = deepcopy(self.config)
+        return _input_sets
+
+
+@dataclass
+class LammpsInputSets(object):
+    TypeMap = {'default': 'lmp_md.in'}
+
+    structure: StructureData
+    kinds: list
+    init_template: str
+    variables: dict
+    graphs: list
+
+    @property
+    def template(self):
+        _template = os.path.join(CONFIG_DIR, self.TypeMap[self.init_template])
+        return _template
+
+    @property
+    def input_sets(self):
+        files = {}
+        for i, graph in enumerate(self.graphs):
+            with open('test.log', 'w') as f:
+                f.write(os.path.abspath(graph))
+                f.write('\n')
+                f.write(os.getcwd())
+            files[f'graph_{i}'] = SinglefileData(file=os.path.abspath(graph))
+        variables = self.variables
+        variables.update({'GRAPHS': ' '.join([f'{g}.pb' for g in files.keys()]),
+                          'SEED': np.random.randint(10000000),
+                          '_INPUT_STRUCTURE': 'input.data'})
+        _input_sets = {
+            'template': self.template,
+            'variables': variables,
+            'file': files
+        }
         return _input_sets

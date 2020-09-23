@@ -3,13 +3,46 @@ from abc import ABCMeta, abstractmethod
 from aiida.orm import Code, Dict, StructureData
 from aiida_cp2k.workchains import Cp2kBaseWorkChain
 from aiida_deepmd.calculations.dp import DpCalculation
+from aiida_lammps.calculations.lammps.template import TemplateCalculation
 from ase import Atoms
 
 from ecint.preprocessor.utils import get_procs_per_node_from_code_name, \
     load_machine, uniform_neb
 
 __all__ = ['EnergyPreprocessor', 'GeooptPreprocessor', 'NebPreprocessor',
-           'FrequencyPreprocessor', 'DeepmdPreprocessor']
+           'FrequencyPreprocessor', 'DeepmdPreprocessor', 'LammpsPreprocessor']
+
+
+def set_machine(builder, restrict_machine, isslurm=False):
+    """
+
+    Args:
+        builder (aiida.engine.processes.builder.ProcessBuilder):
+        restrict_machine (dict):
+        isslurm (bool):
+
+    Returns:
+        aiida.engine.processes.builder.ProcessBuilder
+
+    """
+    builder.code = \
+        Code.get_from_string(restrict_machine.get('code@computer'))
+    builder.metadata.options.resources = {
+        'tot_num_mpiprocs': restrict_machine.get('tot_num_mpiprocs')
+    }
+    # TODO (@robin): whether let users to change num_machines or not
+    if isslurm:
+        builder.metadata.options.resources.update({'num_machines': 1})
+    if restrict_machine.get('max_wallclock_seconds'):
+        builder.metadata.options.max_wallclock_seconds = \
+            restrict_machine.get('max_wallclock_seconds')
+    if restrict_machine.get('queue_name'):
+        builder.metadata.options.queue_name = \
+            restrict_machine.get('queue_name')
+    if restrict_machine.get('custom_scheduler_commands'):
+        builder.metadata.options.custom_scheduler_commands = \
+            restrict_machine.get('custom_scheduler_commands')
+    return builder
 
 
 class Preprocessor(metaclass=ABCMeta):
@@ -59,19 +92,8 @@ class Cp2kPreprocessor(Preprocessor):
             _builder.cp2k.structure = StructureData(ase=self.structure)
         _builder.cp2k.parameters = \
             self.parameters
-        _builder.cp2k.code = \
-            Code.get_from_string(self.machine.get('code@computer'))
-        _builder.cp2k.metadata.options.resources = \
-            {'tot_num_mpiprocs': self.machine.get('tot_num_mpiprocs')}
-        if self.machine.get('max_wallclock_seconds'):
-            _builder.cp2k.metadata.options.max_wallclock_seconds = \
-                self.machine.get('max_wallclock_seconds')
-        if self.machine.get('queue_name'):
-            _builder.cp2k.metadata.options.queue_name = \
-                self.machine.get('queue_name')
-        if self.machine.get('custom_scheduler_commands'):
-            _builder.cp2k.metadata.options.custom_scheduler_commands = \
-                self.machine.get('custom_scheduler_commands')
+
+        set_machine(_builder['cp2k'], self.machine)
         return _builder
 
 
@@ -92,21 +114,28 @@ class DeepmdPreprocessor(Preprocessor):
         _builder.model = Dict(dict=self.parameters['model'])
 
         # machine information
-        _builder.code = \
-            Code.get_from_string(self.machine.get('code@computer'))
-        _builder.metadata.options.resources = {
-            'num_machines': 1,
-            'tot_num_mpiprocs': self.machine.get('tot_num_mpiprocs')
-        }
-        if self.machine.get('max_wallclock_seconds'):
-            _builder.metadata.options.max_wallclock_seconds = \
-                self.machine.get('max_wallclock_seconds')
-        if self.machine.get('queue_name'):
-            _builder.metadata.options.queue_name = \
-                self.machine.get('queue_name')
-        if self.machine.get('custom_scheduler_commands'):
-            _builder.metadata.options.custom_scheduler_commands = \
-                self.machine.get('custom_scheduler_commands')
+        set_machine(_builder, self.machine, isslurm=True)
+        return _builder
+
+
+class LammpsPreprocessor(Preprocessor):
+    def __init__(self, inpclass, restrict_machine=None):
+        super(LammpsPreprocessor, self).__init__(inpclass, restrict_machine)
+        self.structure = inpclass.structure
+        self.kinds = inpclass.kinds
+
+    @property
+    def builder(self):
+        _builder = TemplateCalculation.get_builder()
+        _builder.structure = self.structure
+        _builder.kinds = self.kinds
+        _builder.template = self.parameters['template']
+        _builder.variables = self.parameters['variables']
+        _builder.file = self.parameters['file']
+        _builder.settings = Dict(
+            dict={'additional_retrieve_list': ['model_devi.out']})
+
+        set_machine(_builder, self.machine, isslurm=True)
         return _builder
 
 

@@ -6,7 +6,7 @@ from aiida.engine import WorkChain
 from aiida.orm import Float, List, SinglefileData, StructureData, TrajectoryData
 
 from ecint.config import default_cp2k_large_machine, default_cp2k_machine, \
-    default_dpmd_gpu_machine, RESULT_NAME
+    default_dpmd_gpu_machine, default_lmp_gpu_machine, RESULT_NAME
 from ecint.postprocessor.utils import AU2EV, get_last_frame, \
     write_xyz_from_structure, write_xyz_from_trajectory
 from ecint.postprocessor.visualization import plot_energy_curve
@@ -14,12 +14,11 @@ from ecint.preprocessor import *
 from ecint.preprocessor.input import *
 from ecint.preprocessor.kind import DZVPPBE, KindSection
 from ecint.preprocessor.utils import check_config_machine, inspect_node, \
-    uniform_neb
+    load_machine, uniform_neb
 
 __all__ = ['EnergySingleWorkChain', 'GeooptSingleWorkChain',
            'NebSingleWorkChain', 'FrequencySingleWorkChain',
-           'DeepmdSingleWorkChain']
-
+           'DeepmdSingleWorkChain', 'LammpsSingleWorkChain']
 
 # def load_default_config(config_name):
 #     return load_config(os.path.join(CONFIG_DIR, config_name))
@@ -231,8 +230,8 @@ class NebSingleWorkChain(BaseSingleWorkChain):
             inp.add_config({
                 'MOTION': {
                     'BAND': {
-                        'REPLICA': [{'COORD_FILE_NAME':
-                                         f'image_{image_index}.xyz'}]
+                        'REPLICA': [
+                            {'COORD_FILE_NAME': f'image_{image_index}.xyz'}]
                     }
                 }
             })
@@ -409,3 +408,44 @@ class DeepmdSingleWorkChain(BaseSingleWorkChain):
         with open(RESULT_NAME, 'a') as f:
             f.write(f'# Step: Deepmd Training, '
                     f'PK: {self.ctx.dpmd_workchain.pk}\n')
+
+
+class LammpsSingleWorkChain(BaseSingleWorkChain):
+    @classmethod
+    def define(cls, spec):
+        super(LammpsSingleWorkChain, cls).define(spec)
+        spec.input('structure', valid_type=StructureData)
+        spec.input('kinds', valid_type=list, required=False, non_db=True)
+        spec.input('template', valid_type=str, default='default', non_db=True)
+        spec.input('variables', valid_type=dict, required=False, non_db=True)
+        spec.input('graphs', valid_type=list, required=False, non_db=True)
+        spec.input('machine', default=default_lmp_gpu_machine,
+                   valid_type=dict, required=False, non_db=True)
+
+        spec.outline(
+            cls.submit_lmp,
+            cls.inspect_lmp,
+            cls.write_results
+        )
+
+        # spec.output()
+
+    def submit_lmp(self):
+        inp = LammpsInputSets(structure=self.inputs.structure,
+                              kinds=self.inputs.kinds,
+                              init_template=self.inputs.template,
+                              variables=self.inputs.variables,
+                              graphs=self.inputs.graphs)
+        pre = LammpsPreprocessor(inp, load_machine(self.inputs.machine))
+        builder = pre.builder
+        node = self.submit(builder)
+        self.to_context(lmp_workchain=node)
+
+    def inspect_lmp(self):
+        inspect_node(self.ctx.lmp_workchain)
+
+    def write_results(self):
+        os.chdir(self.inputs.resdir)
+        with open(RESULT_NAME, 'a') as f:
+            f.write(f'# Step: Lammps Model Deviation, '
+                    f'PK: {self.ctx.lmp_workchain.pk}\n')
