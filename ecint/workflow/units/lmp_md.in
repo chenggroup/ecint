@@ -12,7 +12,7 @@ atom_style      atomic
 
 neighbor        1.0 bin
 
-box          tilt large
+#box          tilt large
 read_data       ${_INPUT_STRUCTURE}
 change_box   all triclinic
 
@@ -21,7 +21,7 @@ pair_coeff
 
 thermo_style    custom step temp pe ke etotal press vol lx ly lz xy xz yz
 thermo          ${THERMO_FREQ}
-dump            1 all custom ${DUMP_FREQ} traj/*.lammpstrj id type x y z
+dump            1 all custom ${DUMP_FREQ} *.lammpstrj id type x y z
 
 velocity        all create ${TEMP} ${SEED}
 fix             1 all nvt temp ${TEMP} ${TEMP} ${TAU_T}
