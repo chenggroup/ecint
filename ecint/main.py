@@ -46,7 +46,7 @@ class DpUserInput(BaseUserInput):
     datadirs: list = None
 
     def get_workflow_inp(self):
-        workflow_inp = {'datadirs': self.datadirs,
+        workflow_inp = {'datadirs': list(map(os.path.abspath, self.datadirs)),
                         **load_input(asdict(self), resdir=self.resdir)}
         return workflow_inp
 
@@ -106,6 +106,19 @@ def create_userinput(workflow_name):
         return DpUserInput
 
 
+# TODO: use this method temporarily for testing, when users input,
+#  please use absolutely path directly
+def convert_graphs_path(graphs):
+    if isinstance(graphs, dict):
+        for k, v in graphs.items():
+            graphs[k] = list(map(os.path.abspath, v))
+        return graphs
+    elif isinstance(graphs, list):
+        return list(map(os.path.abspath, graphs))
+    else:
+        raise TypeError('Graphs need be dict or list')
+
+
 def load_workflow(workflow_name):
     """Convert warkflow name to WorkChain Process
 
@@ -146,6 +159,9 @@ def _load_subdata(subdata):
 
 
 def _load_metadata(metadata):
+    # TODO: remove when remove get_abs_path
+    if metadata.get('graphs'):
+        metadata['graphs'] = convert_graphs_path(metadata['graphs'])
     return {**_load_subdata(metadata)}, {**metadata}
 
 
@@ -245,6 +261,8 @@ class Ecint(WorkChain):
         return True if self.inputs.get('webhook') else False
 
     def submit_workchain(self):
+        self.report(f'Your workflow is: {self.inputs.workflow}\n'
+                    f'Your input is: {self.inputs.workflow_inp}')
         node = self.submit(load_workflow(self.inputs.workflow),
                            **self.inputs.workflow_inp)
         self.to_context(workchain=node)
