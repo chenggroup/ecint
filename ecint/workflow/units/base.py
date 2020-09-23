@@ -366,6 +366,8 @@ class DeepmdSingleWorkChain(BaseSingleWorkChain):
     def define(cls, spec):
         super(DeepmdSingleWorkChain, cls).define(spec)
         spec.input('datadirs', valid_type=list, required=True, non_db=True)
+        spec.input('kinds', valid_type=list, required=True, non_db=True)
+        spec.input('descriptor_sel', valid_type=list, required=True, non_db=True)
         spec.input(
             'machine',
             default=default_dpmd_gpu_machine,
@@ -387,6 +389,8 @@ class DeepmdSingleWorkChain(BaseSingleWorkChain):
     def submit_dpmd(self):
         inp = DeepmdInputSets(
             datadirs=self.inputs.datadirs,
+            kinds=self.inputs.kinds,
+            descriptor_sel=self.inputs.descriptor_sel,
             config=self.ctx.config
         )
         pre = DeepmdPreprocessor(inp, self.ctx.machine)

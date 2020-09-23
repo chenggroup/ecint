@@ -266,8 +266,10 @@ class DeepmdInputSets(object):
     """
     TypeMap = {'default': 'dpmd.json'}
 
-    def __init__(self, datadirs, config='default'):
+    def __init__(self, datadirs, kinds, descriptor_sel, config='default'):
         self._datadirs = datadirs
+        self._kinds = kinds
+        self._descriptor_sel = descriptor_sel
         self._config = config
 
     @property
@@ -275,13 +277,24 @@ class DeepmdInputSets(object):
         return self._datadirs
 
     @property
+    def kinds(self):
+        return self._kinds
+
+    @property
+    def descriptor_sel(self):
+        return self._descriptor_sel
+
+    @property
     def config(self):
         _config = make_tag_config(self._config, self.TypeMap)
         return _config
 
+    # update parameter/dict here
     @property
     def input_sets(self):
         _input_sets = deepcopy(self.config)
+        _input_sets['model']['type_map'] = self.kinds
+        _input_sets['model']['descriptor']['sel'] = self.descriptor_sel
         return _input_sets
 
 

@@ -3,6 +3,10 @@
   "webhook": "https://oapi.dingtalk.com/robot/send?access_token=xxx",
   "resdir": "results_json",
   "datadirs": [
-    "./train_data"
-  ]
+    "/home/xjf/projects/ecint/example/dpmd_train/train_data"
+  ],
+ "metadata":{
+	  "kinds": ["A", "B"],
+	  "descriptor_sel": [50, 100]
+  }
 }

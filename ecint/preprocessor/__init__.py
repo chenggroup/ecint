@@ -101,12 +101,15 @@ class DeepmdPreprocessor(Preprocessor):
     def __init__(self, inpclass, restrict_machine=None):
         super(DeepmdPreprocessor, self).__init__(inpclass, restrict_machine)
         self.datadirs = inpclass.datadirs
+        self.kinds = inpclass.kinds
+        self.descriptor_sel = inpclass.descriptor_sel
 
     @property
     def builder(self):
         _builder = DpCalculation.get_builder()
         if isinstance(self.datadirs, list):
             _builder.datadirs = self.datadirs
+
         # place the input parameters
         _builder.loss = Dict(dict=self.parameters['loss'])
         _builder.training = Dict(dict=self.parameters['training'])
