@@ -1,27 +1,27 @@
-import json
+import os
 import sys
 from itertools import groupby
 from os.path import exists, isabs, isdir
 from pathlib import PurePath
 from warnings import warn
 
+import json5
 import numpy as np
-from aiida.orm import Computer, StructureData
+from aiida.orm import Computer, SinglefileData, StructureData
 from ase import Atoms
 from ase.io import read
 from ase.io.extxyz import key_val_str_to_dict
 from ruamel import yaml
+from scipy.optimize import curve_fit
 
 from ecint.config import default_cp2k_machine
 from ecint.preprocessor.kind import KindSection
-
-from scipy.optimize import curve_fit
 
 
 def load_json(json_path):
     with open(json_path) as f:
         # d = json.load(f, object_pairs_hook=OrderedDict)
-        d = json.load(f)
+        d = json5.load(f)
     return d
 
 
@@ -33,6 +33,17 @@ def load_yaml(yaml_path):
 
 
 def _preparse_xyz(filename, **kwargs):
+    """
+    Only xyz format supports elements like symbol + tag, for example, Fe2
+
+    Args:
+        filename: str or file-like object
+        **kwargs:
+
+    Returns:
+        ase.Atoms:
+
+    """
     try:
         atoms = read(filename, **kwargs)
     except KeyError:
@@ -40,8 +51,12 @@ def _preparse_xyz(filename, **kwargs):
             filename = str(filename)
         if filename == '-':
             filename = sys.stdin
-        with open(filename, 'r') as f:
-            xyz_lines = f.readlines()
+        if isinstance(filename, str):
+            with open(filename, 'r') as f:
+                xyz_lines = f.readlines()
+        else:
+            filename.seek(0)
+            xyz_lines = filename.readlines()
         kind_lines = np.array([line.strip().split() for line in xyz_lines[2:]])
         symbols, tags = [], []
         for kind_line in kind_lines[:, 0]:
@@ -57,7 +72,8 @@ def _preparse_xyz(filename, **kwargs):
     return atoms
 
 
-def load_structure(structure, cell=None, pbc=True, **kwargs):
+def load_structure(structure, cell=None, pbc=True, masses=None,
+                   lazy_load=False, **kwargs):
     """
 
     Convert various structure formats to StructureData
@@ -66,17 +82,35 @@ def load_structure(structure, cell=None, pbc=True, **kwargs):
         structure (StructureData or Atoms or str): structure object
         cell (list) : cell parameters
         pbc (bool or list[bool]): pbc in x, y, z
+        masses (dict): masses map for elements
+        lazy_load (bool): if True, upload structure file to server directly,
+            instead of load structure firstly
 
     Returns:
-        StructureData: structure data unstored
+        StructureData or SinglefileData: structure data unstored
 
     """
+    if lazy_load:
+        return SinglefileData(file=os.path.abspath(structure))
     if isinstance(structure, StructureData):
         _structure = structure
     elif isinstance(structure, Atoms):
         _structure = StructureData(ase=structure)
     elif isinstance(structure, str):
         atoms = _preparse_xyz(structure, **kwargs)
+        if masses:
+            symbols = np.array(atoms.get_chemical_symbols())
+            tags = atoms.get_tags()
+            for element, mass in masses.items():
+                symbol_with_tag = [''.join(list(g)) for k, g in
+                                   groupby(element, key=lambda x: x.isdigit())]
+                symbol = symbol_with_tag[0]
+                tag = (int(symbol_with_tag[1])
+                       if len(symbol_with_tag) == 2 else 0)
+                s_index = np.argwhere(symbols == symbol)
+                t_index = np.argwhere(tags == tag)
+                for i in np.intersect1d(s_index, t_index):
+                    atoms[i].mass = mass
         if not atoms.get_cell():
             atoms.set_cell(cell)
         atoms.set_pbc(pbc)
@@ -456,10 +490,12 @@ def uniform_neb(config, restrict_machine):
              ResourceWarning)
     return is_changed
 
+
 def birch_murnaghan_equation(V, V0, E0, B0, B0_prime):
     V_ratio = np.power(np.divide(V0, V), np.divide(2, 3))
     E = E0 + np.divide((9 * V0 * B0), 16) * (np.power(V_ratio - 1, 3) * B0_prime
-            + np.power((V_ratio -1), 2) * (6 - 4 * V_ratio))
+                                             + np.power((V_ratio - 1), 2) * (
+                                                     6 - 4 * V_ratio))
     return E
 
 

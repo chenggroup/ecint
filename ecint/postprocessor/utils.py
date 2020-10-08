@@ -151,7 +151,7 @@ def notification_in_dingtalk(webhook, node):
         structure = getattr(node.inputs,
                             next(filter(lambda x: re.match(r'structure.*', x),
                                         dir(node.inputs))))
-    except StopIteration:
+    except:
         pass
     text = '## Job Info\n'
     text += 'Your job is over!\n'

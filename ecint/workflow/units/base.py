@@ -12,6 +12,7 @@ from ecint.postprocessor.utils import AU2EV, get_last_frame, \
 from ecint.postprocessor.visualization import plot_energy_curve
 from ecint.preprocessor import *
 from ecint.preprocessor.input import *
+from ecint.preprocessor.input import make_tag_config
 from ecint.preprocessor.kind import DZVPPBE, KindSection
 from ecint.preprocessor.utils import check_config_machine, inspect_node, \
     load_machine, uniform_neb
@@ -19,6 +20,7 @@ from ecint.preprocessor.utils import check_config_machine, inspect_node, \
 __all__ = ['EnergySingleWorkChain', 'GeooptSingleWorkChain',
            'NebSingleWorkChain', 'FrequencySingleWorkChain',
            'DeepmdSingleWorkChain', 'LammpsSingleWorkChain']
+
 
 # def load_default_config(config_name):
 #     return load_config(os.path.join(CONFIG_DIR, config_name))
@@ -212,7 +214,9 @@ class NebSingleWorkChain(BaseSingleWorkChain):
 
     def check_config_machine(self):
         self.ctx.config, self.ctx.machine = \
-            check_config_machine(self.inputs.config, self.inputs.machine,
+            check_config_machine(make_tag_config(self.inputs.config,
+                                                 NebInputSets.TypeMap),
+                                 self.inputs.machine,
                                  uniform_func=uniform_neb)
 
     def set_cell_and_pbc(self):
@@ -367,14 +371,10 @@ class DeepmdSingleWorkChain(BaseSingleWorkChain):
         super(DeepmdSingleWorkChain, cls).define(spec)
         spec.input('datadirs', valid_type=list, required=True, non_db=True)
         spec.input('kinds', valid_type=list, required=True, non_db=True)
-        spec.input('descriptor_sel', valid_type=list, required=True, non_db=True)
-        spec.input(
-            'machine',
-            default=default_dpmd_gpu_machine,
-            valid_type=dict,
-            required=False,
-            non_db=True
-        )
+        spec.input('descriptor_sel', valid_type=list,
+                   required=True, non_db=True)
+        spec.input('machine', default=default_dpmd_gpu_machine,
+                   valid_type=dict, required=False, non_db=True)
 
         spec.outline(
             cls.check_config_machine,
@@ -384,7 +384,7 @@ class DeepmdSingleWorkChain(BaseSingleWorkChain):
             cls.write_results
         )
 
-        spec.output('model.pb', valid_type=SinglefileData)
+        spec.output('model', valid_type=SinglefileData)
 
     def submit_dpmd(self):
         inp = DeepmdInputSets(
@@ -402,10 +402,10 @@ class DeepmdSingleWorkChain(BaseSingleWorkChain):
         inspect_node(self.ctx.dpmd_workchain)
 
     def get_pb(self):
-        model = (self.ctx.dpmd_workchain.outputs.
-                 retrieved.open('model.pb', mode='rb'))
-        self.ctx.model = SinglefileData(file=model)
-        self.out('model.pb', self.ctx.model.store())
+        with self.ctx.dpmd_workchain.outputs.retrieved.open('model.pb',
+                                                            mode='rb') as f:
+            model = SinglefileData(file=f)
+        self.out('model', model.store())
 
     def write_results(self):
         os.chdir(self.inputs.resdir)
@@ -418,7 +418,7 @@ class LammpsSingleWorkChain(BaseSingleWorkChain):
     @classmethod
     def define(cls, spec):
         super(LammpsSingleWorkChain, cls).define(spec)
-        spec.input('structure', valid_type=StructureData)
+        spec.input('structure', valid_type=(StructureData, SinglefileData))
         spec.input('kinds', valid_type=list, required=False, non_db=True)
         spec.input('template', valid_type=str, default='default', non_db=True)
         spec.input('variables', valid_type=dict, required=False, non_db=True)
@@ -429,10 +429,11 @@ class LammpsSingleWorkChain(BaseSingleWorkChain):
         spec.outline(
             cls.submit_lmp,
             cls.inspect_lmp,
+            cls.get_model_devi,
             cls.write_results
         )
 
-        # spec.output()
+        spec.output('model_devi', valid_type=SinglefileData)
 
     def submit_lmp(self):
         inp = LammpsInputSets(structure=self.inputs.structure,
@@ -448,8 +449,19 @@ class LammpsSingleWorkChain(BaseSingleWorkChain):
     def inspect_lmp(self):
         inspect_node(self.ctx.lmp_workchain)
 
+    def get_model_devi(self):
+        with self.ctx.lmp_workchain.outputs.retrieved.open('model_devi.out',
+                                                           mode='rb') as f:
+            self.ctx.model_devi = SinglefileData(file=f)
+        self.out('model_devi', self.ctx.model_devi.store())
+
     def write_results(self):
         os.chdir(self.inputs.resdir)
+        output_model_devi_name = self.ctx.model_devi.filename
+        with open(output_model_devi_name) as f:
+            f.write(self.ctx.model_devi.get_content())
+
         with open(RESULT_NAME, 'a') as f:
             f.write(f'# Step: Lammps Model Deviation, '
                     f'PK: {self.ctx.lmp_workchain.pk}\n')
+            f.write(f'model_devi file: {output_model_devi_name}')

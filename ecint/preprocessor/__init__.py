@@ -31,6 +31,8 @@ def set_machine(builder, restrict_machine, isslurm=False):
         'tot_num_mpiprocs': restrict_machine.get('tot_num_mpiprocs')
     }
     # TODO (@robin): whether let users to change num_machines or not
+    # TODO: make general Preprocessor for another job scheduler,
+    #  now just for LSF, SLURM
     if isslurm:
         builder.metadata.options.resources.update({'num_machines': 1})
     if restrict_machine.get('max_wallclock_seconds'):
@@ -77,8 +79,6 @@ class Preprocessor(metaclass=ABCMeta):
 
 
 class Cp2kPreprocessor(Preprocessor):
-    # TODO: make general Preprocessor for another job scheduler,
-    #  now just for LSF
     def __init__(self, inpclass, restrict_machine=None):
         super(Cp2kPreprocessor, self).__init__(inpclass, restrict_machine)
         self.structure = inpclass.structure
@@ -90,8 +90,7 @@ class Cp2kPreprocessor(Preprocessor):
             _builder.cp2k.structure = self.structure
         elif isinstance(self.structure, Atoms):
             _builder.cp2k.structure = StructureData(ase=self.structure)
-        _builder.cp2k.parameters = \
-            self.parameters
+        _builder.cp2k.parameters = self.parameters
 
         set_machine(_builder['cp2k'], self.machine)
         return _builder

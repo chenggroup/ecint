@@ -287,6 +287,8 @@ class DeepmdInputSets(object):
     @property
     def config(self):
         _config = make_tag_config(self._config, self.TypeMap)
+        datadirs = list(map(os.path.basename, self.datadirs))
+        _config['training'].update({"systems": datadirs})
         return _config
 
     # update parameter/dict here
@@ -310,7 +312,11 @@ class LammpsInputSets(object):
 
     @property
     def template(self):
-        _template = os.path.join(CONFIG_DIR, self.TypeMap[self.init_template])
+        if self.init_template in self.TypeMap:
+            _template = os.path.join(CONFIG_DIR,
+                                     self.TypeMap[self.init_template])
+        else:
+            _template = self.init_template
         return _template
 
     @property
@@ -319,9 +325,11 @@ class LammpsInputSets(object):
         for i, graph in enumerate(self.graphs):
             files[f'graph_{i}'] = SinglefileData(file=os.path.abspath(graph))
         variables = self.variables
-        variables.update({'GRAPHS': ' '.join([f'{g}.pb' for g in files.keys()]),
-                          'SEED': np.random.randint(10000000),
-                          '_INPUT_STRUCTURE': 'input.data'})
+        variables.update({
+            '_GRAPHS': ' '.join([f'{g}.pb' for g in files.keys()]),
+            '_SEED': np.random.randint(10000000),
+            '_INPUT_STRUCTURE': 'input.data'
+        })
         _input_sets = {
             'template': self.template,
             'variables': variables,

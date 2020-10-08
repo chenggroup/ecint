@@ -16,14 +16,14 @@ neighbor        1.0 bin
 read_data       ${_INPUT_STRUCTURE}
 change_box   all triclinic
 
-pair_style      deepmd ${GRAPHS}  out_freq ${THERMO_FREQ} out_file model_devi.out
+pair_style      deepmd ${_GRAPHS}  out_freq ${THERMO_FREQ} out_file model_devi.out
 pair_coeff
 
 thermo_style    custom step temp pe ke etotal press vol lx ly lz xy xz yz
 thermo          ${THERMO_FREQ}
 dump            1 all custom ${DUMP_FREQ} *.lammpstrj id type x y z
 
-velocity        all create ${TEMP} ${SEED}
+velocity        all create ${TEMP} ${_SEED}
 fix             1 all nvt temp ${TEMP} ${TEMP} ${TAU_T}
 
 timestep        0.000500

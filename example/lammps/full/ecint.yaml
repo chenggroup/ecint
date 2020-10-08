@@ -1,17 +1,23 @@
 workflow: LammpsSingleWorkChain
 webhook: https://oapi.dingtalk.com/robot/send?access_token=a3cd7e35c31f149248a46053f51b11ad843cc50a975730e565cb3f0292f8e56b
 resdir: results_yaml
-structure: Au13O2.xyz
-cell: [15, 15, 15]
-masses:
-  O1: 16
+structure: conf-all.lmp
+format: lammps-data
+options:
+  lazy_load: true
 metadata:
-  kinds: [ 'Au', 'O1' ]
-  graphs: [ 'graph.000.pb', 'graph.001.pb', 'graph.002.pb', 'graph.003.pb' ]
+  kinds: [ Au, O ]
+  template: input.lammps
+  graphs: [ '../md/graph.000.pb', '../md/graph.001.pb', '../md/graph.002.pb', '../md/graph.003.pb' ]
   variables:
     NSTEPS: 1000
     THERMO_FREQ: 10
     DUMP_FREQ: 10
-    TEMP: 323
+    TEMP: 330
     PRES: -1
+    TIMESTEP: 0.0005
+    FORCE_CONSTANT: 80
+    DISTANCE: 1.3
+    V_ID: 14 15
+
   # _INPUT_STRUCTURE, _GRAPHS and _SEED could not be used as template variables

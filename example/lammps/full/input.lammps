@@ -1,0 +1,41 @@
+#variable        NSTEPS          equal 40000
+#variable        THERMO_FREQ     equal 10
+#variable        DUMP_FREQ       equal 10
+#variable        TEMP            equal 330
+#variable        PRES            equal -1.000000
+#variable        TIMESTEP        equal 0.000500
+variable        TAU_T           equal ${TIMESTEP}*100
+
+#################### Setup ########################
+units           metal
+boundary        p p p
+atom_style      full
+atom_modify     map yes
+
+neighbor        1.0 bin
+neigh_modify    delay 10 every 1
+read_data       ${_INPUT_STRUCTURE}
+
+
+pair_style      deepmd ${_GRAPHS} out_freq 1 out_file model_devi.out
+pair_coeff
+
+#################### Sampling ###################$$
+velocity        all create ${TEMP} ${_SEED}
+bond_style      harmonic
+bond_coeff      $Au ${FORCE_CONSTANT} ${DISTANCE}
+group           sub id ${V_ID}
+
+fix             1 all nvt temp ${TEMP} ${TEMP} ${TAU_T}
+fix             2 all store/force
+fix             3 sub shake 0.0001 20 10 b $Au
+
+#################### Print #########################
+thermo_style    custom step temp pe ke etotal
+thermo          ${THERMO_FREQ}
+
+dump            dpgen_dump all custom 1 all.dump id type x y z fx fy fz
+dump            dpgen_dump2 all custom 1 store.dump id type x y z f_2[1] f_2[2] f_2[3]
+
+timestep        ${TIMESTEP}
+run             ${NSTEPS}

@@ -1,6 +1,6 @@
 workflow: NebSingleWorkChain
-#webhook: https://oapi.dingtalk.com/robot/send?access_token=xxx
-resdir: results
+webhook: https://oapi.dingtalk.com/robot/send?access_token=a3cd7e35c31f149248a46053f51b11ad843cc50a975730e565cb3f0292f8e56b
+resdir: results_yaml
 structure:
   - is.xyz
   - fs.xyz

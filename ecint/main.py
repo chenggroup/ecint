@@ -13,8 +13,8 @@ from tqdm import tqdm
 from ecint.config import RESULT_NAME
 from ecint.postprocessor.utils import notification_in_dingtalk
 from ecint.preprocessor.kind import KindSection
-from ecint.preprocessor.utils import load_config, load_json, load_kind, \
-    load_machine, load_structure, load_yaml
+from ecint.preprocessor.utils import load_config, load_kind, \
+    load_machine, load_structure
 
 load_profile()
 
@@ -57,8 +57,11 @@ class SmUserInput(BaseUserInput):
     # if set, high-throughput calc will run, conflicting with `structure`
     structures_folder: str = None
     structure: str or list = None
+    format: str = None
     cell: list = field(default_factory=list)
     pbc: bool or list = True
+    masses: dict = None
+    options: dict = None
 
     @property
     def has_structures_folder(self):
@@ -83,7 +86,10 @@ class SmUserInput(BaseUserInput):
                         workflow_inp.append(
                             {'structure': load_structure(structure_dir,
                                                          self.cell,
-                                                         self.pbc),
+                                                         self.pbc,
+                                                         self.masses,
+                                                         format=self.format,
+                                                         **self.options),
                              **load_input(asdict(self),
                                           resdir=resdir)}
                         )
@@ -162,6 +168,8 @@ def _load_metadata(metadata):
     # TODO: remove when remove get_abs_path
     if metadata.get('graphs'):
         metadata['graphs'] = convert_graphs_path(metadata['graphs'])
+    if metadata.get('template'):
+        metadata['template'] = os.path.abspath(metadata['template'])
     return {**_load_subdata(metadata)}, {**metadata}
 
 
@@ -203,23 +211,24 @@ def load_input(user_input, resdir):
 
 
 def load_s(user_input):
+    skeys = {'format', 'cell', 'pbc', 'masses'}
     structure_files = user_input.get('structure')
-    cell = user_input.get('cell')
-    pbc = user_input.get('pbc')
+    options = user_input.get('options') or {}
+    sargs = {k: v for k, v in user_input.items() if k in skeys}
     # parse structure
     if structure_files:
         workflow_inp = {}
         if isinstance(structure_files, str) and os.path.isfile(structure_files):
             workflow_inp.update({'structure': load_structure(structure_files,
-                                                             cell,
-                                                             pbc)})
+                                                             **sargs,
+                                                             **options)})
         elif isinstance(structure_files, list):
             if len(structure_files) < 2:
-                raise ValueError(
-                    'The input `structure` list should be at least two')
+                raise ValueError('The input `structure` list '
+                                 'should be at least two')
             structures = {}
             for i, structure_file in enumerate(structure_files):
-                structure = load_structure(structure_file, cell, pbc)
+                structure = load_structure(structure_file, **sargs, **options)
                 structures.update({f'image_{i}': structure})
             workflow_inp.update({'structures': structures})
         else:
@@ -320,6 +329,20 @@ def _submit_ecint(resdir, webhook, workflow, workflow_inp):
         f.write(f'# Your work directory is {os.getcwd()}, PK: {node.pk}\n')
 
 
+def get_userinput(input_file):
+    # load input
+    # try:
+    #     ecint_input = load_json(input_file)
+    # except JSONDecodeError:
+    #     ecint_input = load_yaml(input_file)
+    ecint_input = load_config(input_file)
+    UserInput = create_userinput(ecint_input['workflow'])
+    userinput = UserInput(**ecint_input)
+    # check webhook
+    check_webhook(userinput.webhook)
+    return userinput
+
+
 def submit_from_file(input_file):
     """
 
@@ -330,21 +353,15 @@ def submit_from_file(input_file):
         None
 
     """
-    # load input
-    ecint_input = (load_json(input_file)
-                   if input_file.endswith('.json')
-                   else load_yaml(input_file))
-    UserInput = create_userinput(ecint_input['workflow'])
-    userinput = UserInput(**ecint_input)
-    # check webhook
-    webhook = userinput.webhook
-    check_webhook(webhook)
+    userinput = get_userinput(input_file)
     # submit...
+    resdir = userinput.resdir
+    webhook = userinput.webhook
     workflow = userinput.workflow
     workflow_inp = userinput.get_workflow_inp()
     if isinstance(workflow_inp, dict):
         print('START SUBMIT...')
-        _submit_ecint(resdir=userinput.resdir,
+        _submit_ecint(resdir=resdir,
                       webhook=webhook,
                       workflow=workflow,
                       workflow_inp=workflow_inp)
@@ -352,7 +369,7 @@ def submit_from_file(input_file):
     elif isinstance(workflow_inp, list):
         print('START SUBMIT MULTI STRUCTURES...')
         for i, one_workflow_inp in enumerate(tqdm(workflow_inp)):
-            _submit_ecint(resdir=os.path.join(userinput.resdir, str(i)),
+            _submit_ecint(resdir=os.path.join(resdir, str(i)),
                           webhook=webhook,
                           workflow=workflow,
                           workflow_inp=one_workflow_inp)

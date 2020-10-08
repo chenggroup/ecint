@@ -4,6 +4,6 @@ default_cp2k_machine = {'code@computer': 'cp2k@aiida_test', 'nnode': 1,
 default_cp2k_large_machine = {'code@computer': 'cp2k@aiida_test', 'nnode': 4,
                               'queue': 'large'}
 default_dpmd_gpu_machine = {'code@computer': 'deepmd@metal', 'nprocs': 2,
-                            'queue': 'test', 'ngpu': 1}
+                            'queue': 'gpu', 'ngpu': 1}
 default_lmp_gpu_machine = {'code@computer': 'lammps@metal', 'nprocs': 2,
-                           'queue': 'test', 'ngpu': 1}
+                           'queue': 'gpu', 'ngpu': 1}
