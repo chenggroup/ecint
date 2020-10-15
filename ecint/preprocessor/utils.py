@@ -221,17 +221,12 @@ def update_dict(nested_dict, item):
         None
 
     """
-    for key in item:
-        value = item[key]
-        sub_dict = nested_dict.get(key)
-        if isinstance(sub_dict, dict):
-            update_dict(sub_dict, value)
-        elif isinstance(sub_dict, list) and isinstance(value, list):
-            sub_dict.extend(value)
-        elif not sub_dict:
-            nested_dict.update(item)
+    for k, v in item.items():
+        if isinstance(v, dict):
+            nested_dict[k] = update_dict(nested_dict.get(k, {}), v)
         else:
-            raise ValueError(f'Incoherent data {nested_dict} and {item}')
+            nested_dict[k] = v
+        return nested_dict
 
 
 def get_procs_per_node(computer):
