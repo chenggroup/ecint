@@ -1,4 +1,5 @@
 import json
+import os
 import re
 
 import numpy as np
@@ -8,7 +9,8 @@ from ase.io import read, write
 
 from ecint.postprocessor.parse import parse_band_convergence_like_info
 
-AU2EV = 27.2113838565563
+AU2EV = 2.72113838565563E+01
+AU2AR = 5.29177208590000E-01
 
 PROJECT_NAME = 'aiida'
 TRAJ_NAME = f'{PROJECT_NAME}-pos-1.xyz'
@@ -87,9 +89,12 @@ def get_max_energy_frame(traj_file=REPLICA_NAME, write_name=MAX_ENERGY_NAME,
     return atoms_max_energy
 
 
-def write_output_files():
-    # split write output files step from workchain
-    pass
+def write_output_from_label(label, suffix=None, content=None):
+    if content:
+        filename = label.strip('/') + (suffix if suffix else '')
+        os.makedirs(os.path.basename(filename), exist_ok=True)
+        with open(filename, 'w') as f:
+            f.write(content)
 
 
 def write_xyz_from_structure(structure, output_file):
@@ -128,6 +133,40 @@ def write_xyz_from_trajectory(trajectory, output_file):
         atoms.info.update({'i': structure_index, 'E': f'{energy} eV'})
         traj.append(atoms)
     write(output_file, traj)
+
+
+def write_datadir_from_energyworkchain(dirname, nodes, kinds):
+    """
+
+    Args:
+        dirname:
+        nodes (list): structure should in node.inputs,
+            energy and forces should in node.outputs
+        kinds:
+
+    Returns:
+        None
+
+    """
+    set_path = os.path.join(dirname, 'set.000')
+    os.makedirs(set_path)
+    structures = [node.inputs.structure for node in nodes]
+    n_raw = len(structures)
+    # write type.raw
+    typeraw = [str(kinds.index(kindname)) for kindname in
+               structures[0].get_site_kindnames()]
+    with open(os.path.join(dirname, 'type.raw'), 'w') as f:
+        f.write(' '.join(typeraw))
+    # write box.npy, coord.npy, energy.npy, force.npy
+    box = [structure.cell for structure in structures]
+    coord = [[site.position for site in structure.sites]
+             for structure in structures]
+    energy = [node.outputs.energy.value for node in nodes]
+    force = [node.outputs.forces.get_list() for node in nodes]
+    for name, data in {'box': box, 'coord': coord,
+                       'energy': energy, 'force': force}.items():
+        uniform_data = np.array(data).reshape(n_raw, -1)
+        np.save(os.path.join(set_path, name), uniform_data)
 
 
 def notification_in_dingtalk(webhook, node):
@@ -199,3 +238,20 @@ def get_convergence_info_of_band(band_file):
         'max_force': get_convergence_info_list(max_force)
     }
     return band_convergence_info
+
+
+def get_forces_info(filename):
+    if isinstance(filename, str):
+        with open(filename) as f:
+            output = f.read()
+    else:
+        output = filename.read()
+    forces_info = re.search(r'ATOMIC FORCES in \[a\.u\.\]\s*'
+                            r'# Atom\s*Kind\s*Element\s*X\s*Y\s*Z\n\s(.*)\n\s'
+                            r'SUM OF ATOMIC FORCES',
+                            output,
+                            re.DOTALL)
+    forces = [line.strip().split()[3:]
+              for line in forces_info.group(1).splitlines()]
+    forces = np.array(forces, np.float) * (AU2EV / AU2AR)
+    return forces.tolist()
