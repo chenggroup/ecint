@@ -7,7 +7,7 @@ from aiida.orm import Float, List, SinglefileData, StructureData, TrajectoryData
 
 from ecint.config import default_cp2k_large_machine, default_cp2k_machine, \
     default_dpmd_gpu_machine, default_lmp_gpu_machine, RESULT_NAME
-from ecint.postprocessor.utils import AU2EV, get_last_frame, \
+from ecint.postprocessor.utils import AU2EV, get_forces_info, get_last_frame, \
     write_xyz_from_structure, write_xyz_from_trajectory
 from ecint.postprocessor.visualization import plot_energy_curve
 from ecint.preprocessor import *
@@ -19,7 +19,7 @@ from ecint.preprocessor.utils import check_config_machine, inspect_node, \
 
 __all__ = ['EnergySingleWorkChain', 'GeooptSingleWorkChain',
            'NebSingleWorkChain', 'FrequencySingleWorkChain',
-           'DeepmdSingleWorkChain', 'LammpsSingleWorkChain']
+           'DeepmdSingleWorkChain', 'ModelDeviationSingleWorkChain']
 
 
 # def load_default_config(config_name):
@@ -91,10 +91,12 @@ class EnergySingleWorkChain(BaseSingleWorkChain):
             cls.submit_energy,
             cls.inspect_energy,
             cls.get_energy,
+            cls.get_forces,
             cls.write_results
         )
 
         spec.output('energy', valid_type=Float)
+        spec.output('forces', valid_type=List)
 
     def submit_energy(self):
         inp = EnergyInputSets(structure=self.inputs.structure,
@@ -114,17 +116,29 @@ class EnergySingleWorkChain(BaseSingleWorkChain):
         energy_data = Float(self.ctx.energy)
         self.out('energy', energy_data.store())
 
+    def get_forces(self):
+        with self.ctx.energy_workchain.outputs.retrieved.open('aiida.out') as f:
+            try:
+                self.ctx.forces = get_forces_info(f)
+            except AttributeError:
+                self.ctx.forces = []
+        self.out('forces', List(list=self.ctx.forces).store())
+
     def write_results(self):
         os.chdir(self.inputs.resdir)
-        # write structure with energy
-        output_structure_name = f'{self.inputs.label}.xyz'
-        atoms = self.inputs.structure.get_ase()
-        atoms.info.update({'E': f'{self.ctx.energy} eV'})
-        atoms.write(output_structure_name)
-
         with open(RESULT_NAME, 'a') as f:
             f.write(f'# Step: Energy, PK: {self.ctx.energy_workchain.pk}\n')
             f.write(f'energy (eV): {self.ctx.energy}\n')
+
+        # write structure with energy
+        if self.inputs.label:
+            output_structure_name = self.inputs.label.rstrip('/') + '.xyz'
+            os.makedirs(os.path.dirname(output_structure_name), exist_ok=True)
+            atoms = self.inputs.structure.get_ase()
+            atoms.info.update({'E': f'{self.ctx.energy} eV'})
+            if self.ctx.forces:
+                atoms.set_array('forces', np.array(self.ctx.forces))
+            atoms.write(output_structure_name)
 
 
 class GeooptSingleWorkChain(BaseSingleWorkChain):
@@ -385,6 +399,7 @@ class DeepmdSingleWorkChain(BaseSingleWorkChain):
         )
 
         spec.output('model', valid_type=SinglefileData)
+        spec.output('lcurve', valid_type=SinglefileData)
 
     def submit_dpmd(self):
         inp = DeepmdInputSets(
@@ -405,7 +420,11 @@ class DeepmdSingleWorkChain(BaseSingleWorkChain):
         with self.ctx.dpmd_workchain.outputs.retrieved.open('model.pb',
                                                             mode='rb') as f:
             model = SinglefileData(file=f)
+        with self.ctx.dpmd_workchain.outputs.retrieved.open('lcurve.out',
+                                                            mode='rb') as f:
+            lcurve = SinglefileData(file=f)
         self.out('model', model.store())
+        self.out('lcurve', lcurve.store())
 
     def write_results(self):
         os.chdir(self.inputs.resdir)
@@ -414,15 +433,27 @@ class DeepmdSingleWorkChain(BaseSingleWorkChain):
                     f'PK: {self.ctx.dpmd_workchain.pk}\n')
 
 
-class LammpsSingleWorkChain(BaseSingleWorkChain):
+class ModelDeviationSingleWorkChain(BaseSingleWorkChain):
     @classmethod
     def define(cls, spec):
-        super(LammpsSingleWorkChain, cls).define(spec)
+        super(ModelDeviationSingleWorkChain, cls).define(spec)
+        spec.input('label', default='model_devi',
+                   valid_type=str, required=False, non_db=True)
         spec.input('structure', valid_type=(StructureData, SinglefileData))
         spec.input('kinds', valid_type=list, required=False, non_db=True)
         spec.input('template', valid_type=str, default='default', non_db=True)
         spec.input('variables', valid_type=dict, required=False, non_db=True)
         spec.input('graphs', valid_type=list, required=False, non_db=True)
+        spec.input('model_devi.skip_images', default=0,
+                   valid_type=int, required=False, non_db=True)
+        spec.input('model_devi.force_low_limit', default=0.05,
+                   valid_type=(int, float), required=False, non_db=True)
+        spec.input('model_devi.force_high_limit', default=0.15,
+                   valid_type=(int, float), required=False, non_db=True)
+        spec.input('model_devi.energy_low_limit', default=1e10,
+                   valid_type=float, required=False, non_db=True)
+        spec.input('model_devi.energy_high_limit', default=1e10,
+                   valid_type=float, required=False, non_db=True)
         spec.input('machine', default=default_lmp_gpu_machine,
                    valid_type=dict, required=False, non_db=True)
 
@@ -430,10 +461,14 @@ class LammpsSingleWorkChain(BaseSingleWorkChain):
             cls.submit_lmp,
             cls.inspect_lmp,
             cls.get_model_devi,
+            cls.get_traj_index,
             cls.write_results
         )
 
         spec.output('model_devi', valid_type=SinglefileData)
+        spec.output('candidate', valid_type=List)
+        spec.output('failed', valid_type=List)
+        spec.output('accurate', valid_type=List)
 
     def submit_lmp(self):
         inp = LammpsInputSets(structure=self.inputs.structure,
@@ -455,13 +490,55 @@ class LammpsSingleWorkChain(BaseSingleWorkChain):
             self.ctx.model_devi = SinglefileData(file=f)
         self.out('model_devi', self.ctx.model_devi.store())
 
+    def get_traj_index(self):
+        skip, fmin, fmax, emin, emax = \
+            (self.inputs.model_devi[k] for k in ('skip_images',
+                                                 'force_low_limit',
+                                                 'force_high_limit',
+                                                 'energy_low_limit',
+                                                 'energy_high_limit'))
+        with self.ctx.model_devi.open() as f:
+            model_devi_array = np.loadtxt(f, usecols=[0, 4, 1])
+        valid_model_devi = model_devi_array[model_devi_array[:, 0] >= skip]
+        traj_step, force_devi, energy_devi = valid_model_devi.T
+        # TODO: now only consider cluster_cutoff is None, to consider
+        #  other situations when needed
+        candidate_index = np.union1d(np.argwhere((fmin <= force_devi) &
+                                                 (force_devi < fmax)),
+                                     np.argwhere((emin <= energy_devi) &
+                                                 (energy_devi < emax)))
+        failed_index = np.union1d(np.argwhere(force_devi >= fmax),
+                                  np.argwhere(energy_devi >= emax))
+        accurate_index = np.intersect1d(np.argwhere(force_devi < fmin),
+                                        np.argwhere(energy_devi < emin))
+        traj_step = traj_step.astype(int)
+        self.ctx.candidate_list = traj_step[candidate_index].tolist()
+        failed_list = traj_step[failed_index].tolist()
+        accurate_list = traj_step[accurate_index].tolist()
+        self.out('candidate', List(list=self.ctx.candidate_list).store())
+        self.out('failed', List(list=failed_list).store())
+        self.out('accurate', List(list=accurate_list).store())
+        # traj, force_devi, energy_devi = model_devi_array[:, (0, 4, 1)].T
+        # valid_traj_index, valid_force_index, valid_energy_index = \
+        #     (np.argwhere(traj > skip),  # 默认不取 index 0
+        #      np.argwhere((fmin <= force_devi) & (force_devi < fmax)),
+        #      np.argwhere((emin <= energy_devi) & (energy_devi < emax)))
+        # candidate_index = np.intersect1d(valid_traj_index,
+        #                                  np.union1d(valid_force_index,
+        #                                             valid_energy_index))
+        # self.ctx.candidate_list = traj[candidate_index].tolist()
+        # self.out('candidate', List(list=self.ctx.candidate_list).store())
+
     def write_results(self):
         os.chdir(self.inputs.resdir)
-        output_model_devi_name = self.ctx.model_devi.filename
-        with open(output_model_devi_name) as f:
-            f.write(self.ctx.model_devi.get_content())
-
         with open(RESULT_NAME, 'a') as f:
             f.write(f'# Step: Lammps Model Deviation, '
                     f'PK: {self.ctx.lmp_workchain.pk}\n')
-            f.write(f'model_devi file: {output_model_devi_name}')
+            f.write(f'candidate index: {self.ctx.candidate_list}\n')
+
+        if self.inputs.label:
+            output_model_devi_name = self.inputs.label.rstrip('/') + '.out'
+            with open(output_model_devi_name, 'w') as f:
+                f.write(self.ctx.model_devi.get_content())
+            with open(RESULT_NAME, 'a') as f:
+                f.write(f'model_devi file: {output_model_devi_name}\n')
