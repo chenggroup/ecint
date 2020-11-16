@@ -228,7 +228,7 @@ class EnergyInputSets(UnitsInputSets):
 
     def __init__(self, structure, config='metal', kind_section=DZVPPBE()):
         super(EnergyInputSets, self).__init__(structure, config, kind_section)
-        self.add_config({"GLOBAL": {"RUN_TYPE": "ENERGY",
+        self.add_config({"GLOBAL": {"RUN_TYPE": "ENERGY_FORCE",
                                     "PRINT_LEVEL": "MEDIUM"}})
 
 
@@ -323,7 +323,11 @@ class LammpsInputSets(object):
     def input_sets(self):
         files = {}
         for i, graph in enumerate(self.graphs):
-            files[f'graph_{i}'] = SinglefileData(file=os.path.abspath(graph))
+            if isinstance(graph, str):
+                files[f'graph_{i}'] = SinglefileData(
+                    file=os.path.abspath(graph))
+            elif isinstance(graph, SinglefileData):
+                files[f'graph_{i}'] = graph
         variables = self.variables
         variables.update({
             '_GRAPHS': ' '.join([f'{g}.pb' for g in files.keys()]),
