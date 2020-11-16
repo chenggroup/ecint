@@ -19,11 +19,11 @@ from ecint.preprocessor.utils import load_config, load_kind, \
 load_profile()
 
 
-@dataclass
-class SubData(object):
-    config: str or dict = None
-    kind_section: str or dict or list = None
-    machine: str or dict = None
+# @dataclass
+# class SubData(object):
+#     config: str or dict = None
+#     kind_section: str or dict or list = None
+#     machine: str or dict = None
 
 
 @dataclass
@@ -61,7 +61,7 @@ class SmUserInput(BaseUserInput):
     cell: list = field(default_factory=list)
     pbc: bool or list = True
     masses: dict = None
-    options: dict = None
+    options: dict = field(default_factory=list)
 
     @property
     def has_structures_folder(self):
@@ -74,32 +74,56 @@ class SmUserInput(BaseUserInput):
         if self.has_structures_folder:
             workflow_inp = []
             if os.path.isdir(self.structures_folder):
-                print('Convert Structures...')
-                structure_bar = tqdm(os.listdir(self.structures_folder))
-                for i, structure_file in enumerate(structure_bar):
-                    try:
-                        structure_bar.set_description(f'Upload '
-                                                      f'{structure_file}')
-                        structure_dir = os.path.join(self.structures_folder,
-                                                     structure_file)
-                        resdir = os.path.join(self.resdir, str(i))
-                        workflow_inp.append(
-                            {'structure': load_structure(structure_dir,
-                                                         self.cell,
-                                                         self.pbc,
-                                                         self.masses,
-                                                         format=self.format,
-                                                         **self.options),
-                             **load_input(asdict(self),
-                                          resdir=resdir)}
-                        )
-                    except UnknownFileTypeError as te:
-                        warn(f'{structure_file}: {str(te)}', Warning)
+                structure_settings = {
+                    'cell': self.cell,
+                    'pbc': self.pbc,
+                    'masses': self.masses,
+                    'format': self.format,
+                    **self.options
+                }
+                structures = _load_sfolder(self.structures_folder,
+                                           **structure_settings)
+                for i, structure in enumerate(structures):
+                    resdir = os.path.join(self.resdir, str(i))
+                    workflow_inp.append({'structure': structure,
+                                         **load_input(asdict(self), resdir)})
             else:
                 raise ValueError('`structures_folder` is not a folder')
         else:
             workflow_inp = {**load_s(asdict(self)),
                             **load_input(asdict(self), resdir=self.resdir)}
+        return workflow_inp
+
+
+@dataclass
+class MixUserInput(BaseUserInput):
+    datadirs: list = None
+    # structure related, structures_folder and variables in lmp.in
+    imd: list = None
+    # format: str = None
+    # cell: list = field(default_factory=list)
+    # pbc: bool or list = True
+    # masses: dict = None
+    options: dict = field(default_factory=dict)
+    kinds: list = None
+    descriptor_sel: list = None
+
+    def get_workflow_inp(self):
+        # convert structures_folder in imd
+        imd = []
+        for setting in self.imd:
+            structures = _load_sfolder(setting.pop('structures_folder'),
+                                       **self.options)
+            # for structure in structures:
+            #     structure.store()
+            imd.append({'structures': structures, **setting})
+        workflow_inp = {
+            'datadirs': list(map(os.path.abspath, self.datadirs)),
+            'imd': imd,
+            'kinds': self.kinds,
+            'descriptor_sel': self.descriptor_sel,
+            **load_input(asdict(self), resdir=self.resdir)
+        }
         return workflow_inp
 
 
@@ -110,6 +134,8 @@ def create_userinput(workflow_name):
         return SmUserInput
     elif workflow_type == 'deepmd':
         return DpUserInput
+    elif workflow_type == 'mixing':
+        return MixUserInput
 
 
 # TODO: use this method temporarily for testing, when users input,
@@ -161,16 +187,34 @@ def _load_subdata(subdata):
     if subdata.get('machine'):
         machine = subdata.pop('machine')
         workflow_inp.update({'machine': load_machine(machine)})
+    # TODO: remove when remove get_abs_path
+    if subdata.get('graphs'):
+        graphs = convert_graphs_path(subdata.pop('graphs'))
+        workflow_inp.update({'graphs': graphs})
+    if subdata.get('template'):
+        template = os.path.abspath(subdata.pop('template'))
+        workflow_inp.update({'template': template})
+    # other params
+    workflow_inp.update(**subdata)
     return workflow_inp
 
 
 def _load_metadata(metadata):
-    # TODO: remove when remove get_abs_path
-    if metadata.get('graphs'):
-        metadata['graphs'] = convert_graphs_path(metadata['graphs'])
-    if metadata.get('template'):
-        metadata['template'] = os.path.abspath(metadata['template'])
     return {**_load_subdata(metadata)}, {**metadata}
+
+
+def _load_sfolder(structures_folder, **structure_kwargs):
+    print('Convert Structures...')
+    structure_bar = tqdm(os.listdir(structures_folder))
+    structures = []
+    for structure_file in structure_bar:
+        try:
+            structure_bar.set_description(f'Upload {structure_file}')
+            structure_dir = os.path.join(structures_folder, structure_file)
+            structures.append(load_structure(structure_dir, **structure_kwargs))
+        except UnknownFileTypeError as te:
+            warn(f'{structure_file}: {str(te)}', Warning)
+    return structures
 
 
 def load_input(user_input, resdir):
@@ -322,6 +366,10 @@ def _submit_ecint(resdir, webhook, workflow, workflow_inp):
     elif workflow_inp.get('structures'):
         for structure_data in workflow_inp['structures'].values():
             structure_data.store()
+    elif workflow_inp.get('imd'):
+        for settings in workflow_inp['imd']:
+            for structure in settings['structures']:
+                structure.store()
     node = submit(Ecint, **{'webhook': webhook,
                             'workflow': workflow,
                             'workflow_inp': workflow_inp})
@@ -361,6 +409,7 @@ def submit_from_file(input_file):
     workflow_inp = userinput.get_workflow_inp()
     if isinstance(workflow_inp, dict):
         print('START SUBMIT...')
+        # print(workflow_inp)
         _submit_ecint(resdir=resdir,
                       webhook=webhook,
                       workflow=workflow,

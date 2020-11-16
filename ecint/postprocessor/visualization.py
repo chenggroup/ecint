@@ -1,6 +1,8 @@
 from collections import Counter
+from math import ceil
 
 import matplotlib.pyplot as plt
+import numpy as np
 from aiida.orm import load_node
 from aiida.tools.visualization import Graph
 
@@ -98,3 +100,39 @@ def plot_energy_curve(trajectory, output_file='potential_energy_path.png'):
     ax.plot(range(len(energy)), energy)
     fig.tight_layout()
     fig.savefig(output_file)
+
+
+def get_model_devi_distribution(model_devi_list, force_low_limit,
+                                force_high_limit, skip_images=0,
+                                title='Distribution of force deviation',
+                                filename='force_devi_distribution.jpg'):
+    force = []
+    plt.figure()
+    for model_devi_name in model_devi_list:
+        model_devi = np.loadtxt(model_devi_name)
+        force.extend(model_devi[model_devi[:, 0] >= skip_images][:, 4])
+    hb = plt.hist(force, bins=len(force),
+                  weights=np.ones_like(force) / len(force))
+    xmax, ymax = 5, max(hb[0]) * 1.1
+    plt.xlim(0, xmax)
+    plt.ylim(0, ymax)
+    plt.vlines(force_low_limit, 0, ymax, linestyles='dashed')
+    plt.vlines(force_high_limit, 0, ymax, linestyles='dashed')
+    plt.xlabel('$\sigma_{f}^{max}$ (eV/Å)')
+    plt.ylabel('Distribution')
+    plt.title(title)
+    plt.tight_layout()
+    plt.savefig(filename)
+    return hb[:-1]
+
+
+def get_learning_curve(lcurve_list, filename='force_learning_curve.jpg'):
+    plt.figure()
+    for i, lcurve_name in enumerate(lcurve_list):
+        lcurve = np.loadtxt(lcurve_name, usecols=[0, 5, 6])
+        batch, f_test, f_train = lcurve.T
+        plt.subplot(ceil(len(lcurve_list) / 2), 2, i + 1)
+        plt.plot(batch, f_test, label='test')
+        plt.plot(batch, f_train, label='train')
+        plt.legend()
+    plt.savefig(filename)

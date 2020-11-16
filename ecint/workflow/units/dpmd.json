@@ -53,7 +53,7 @@
 		],
 		"set_prefix": "set",
 		"stop_batch": 2000,
-		"batch_size": 1,
+		"batch_size": "auto",
 		"seed": 1,
 		"_comment": " display and restart",
 		"_comment": " frequencies counted in batch",
