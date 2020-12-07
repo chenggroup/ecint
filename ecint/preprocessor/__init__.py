@@ -3,7 +3,7 @@ from abc import ABCMeta, abstractmethod
 from aiida.orm import Code, Dict, StructureData
 from aiida_cp2k.workchains import Cp2kBaseWorkChain
 from aiida_deepmd.calculations.dp import DpCalculation
-from aiida_lammps.calculations.lammps.template import TemplateCalculation
+from aiida_lammps.calculations.lammps.template import TemplateWorkChain
 from ase import Atoms
 
 from ecint.preprocessor.utils import get_procs_per_node_from_code_name, \
@@ -128,7 +128,7 @@ class LammpsPreprocessor(Preprocessor):
 
     @property
     def builder(self):
-        _builder = TemplateCalculation.get_builder()
+        _builder = TemplateWorkChain.get_builder()
         _builder.structure = self.structure
         _builder.kinds = self.kinds
         _builder.template = self.parameters['template']
