@@ -3,7 +3,8 @@ import re
 
 import numpy as np
 from aiida.engine import WorkChain
-from aiida.orm import Float, List, SinglefileData, StructureData, TrajectoryData
+from aiida.orm import Bool, Float, List, SinglefileData, StructureData, \
+    TrajectoryData
 
 from ecint.config import default_cp2k_large_machine, default_cp2k_machine, \
     default_dpmd_gpu_machine, default_lmp_gpu_machine, RESULT_NAME
@@ -92,11 +93,13 @@ class EnergySingleWorkChain(BaseSingleWorkChain):
             cls.inspect_energy,
             cls.get_energy,
             cls.get_forces,
+            cls.get_converge_info,
             cls.write_results
         )
 
         spec.output('energy', valid_type=Float)
         spec.output('forces', valid_type=List)
+        spec.output('converged', valid_type=Bool)
 
     def submit_energy(self):
         inp = EnergyInputSets(structure=self.inputs.structure,
@@ -124,6 +127,15 @@ class EnergySingleWorkChain(BaseSingleWorkChain):
                 self.ctx.forces = []
         self.out('forces', List(list=self.ctx.forces).store())
 
+    def get_converge_info(self):
+        converge_info = re.search(r'SCF run converged in \s+\d+ steps',
+                                  self.ctx.energy_workchain.outputs.retrieved.
+                                  get_object_content('aiida.out'))
+        if converge_info:
+            self.out('converged', Bool(True).store())
+        else:
+            self.out('converged', Bool(False).store())
+
     def write_results(self):
         os.chdir(self.inputs.resdir)
         with open(RESULT_NAME, 'a') as f:
@@ -133,7 +145,9 @@ class EnergySingleWorkChain(BaseSingleWorkChain):
         # write structure with energy
         if self.inputs.label:
             output_structure_name = self.inputs.label.rstrip('/') + '.xyz'
-            os.makedirs(os.path.dirname(output_structure_name), exist_ok=True)
+            output_structure_dir = os.path.dirname(output_structure_name)
+            if output_structure_dir:
+                os.makedirs(output_structure_dir, exist_ok=True)
             atoms = self.inputs.structure.get_ase()
             atoms.info.update({'E': f'{self.ctx.energy} eV'})
             if self.ctx.forces:
