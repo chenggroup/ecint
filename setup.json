@@ -12,7 +12,6 @@
   ],
   "install_requires": [
     "aiida-core>=1.0.1",
-    "aiida-cp2k>=1.0.0b6",
     "ase>=3.19.0",
     "flask",
     "flask_cors",
@@ -31,13 +30,7 @@
       "inp2config=ecint.preprocessor.inp2config:inp2config"
     ],
     "aiida.workflows": [
-      "ecint.ecint = ecint.main:Ecint",
-      "ecint.neb = ecint.workflow:NebWorkChain",
-      "ecint.energy_s = ecint.workflow:EnergySingleWorkChain",
-      "ecint.geoopt_s = ecint.workflow:GeooptSingleWorkChain",
-      "ecint.neb_s = ecint.workflow:NebSingleWorkChain",
-      "ecint.frequency_s = ecint.workflow:FrequencySingleWorkChain",
-      "ecint.cellopt = ecint.workflow:CelloptWorkChain"
+      "ecint.ecint = ecint.main:Ecint"
     ]
   },
   "setup_requires": [
