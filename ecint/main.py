@@ -56,12 +56,13 @@ class SmUserInput(BaseUserInput):
     # structure section
     # if set, high-throughput calc will run, conflicting with `structure`
     structures_folder: str = None
+    is_batch: bool = False
     structure: str or list = None
     format: str = None
     cell: list = field(default_factory=list)
     pbc: bool or list = True
     masses: dict = None
-    options: dict = field(default_factory=list)
+    options: dict = field(default_factory=dict)
 
     @property
     def has_structures_folder(self):
@@ -72,7 +73,6 @@ class SmUserInput(BaseUserInput):
 
     def get_workflow_inp(self):
         if self.has_structures_folder:
-            workflow_inp = []
             if os.path.isdir(self.structures_folder):
                 structure_settings = {
                     'cell': self.cell,
@@ -83,10 +83,16 @@ class SmUserInput(BaseUserInput):
                 }
                 structures = _load_sfolder(self.structures_folder,
                                            **structure_settings)
-                for i, structure in enumerate(structures):
-                    resdir = os.path.join(self.resdir, str(i))
-                    workflow_inp.append({'structure': structure,
-                                         **load_input(asdict(self), resdir)})
+                if not self.is_batch:
+                    workflow_inp = []
+                    for i, structure in enumerate(structures):
+                        resdir = os.path.join(self.resdir, str(i))
+                        workflow_inp.append({'structure': structure,
+                                             **load_input(asdict(self), resdir)}
+                                            )
+                else:
+                    workflow_inp = {'structures': structures,
+                                    **load_input(asdict(self), self.resdir)}
             else:
                 raise ValueError('`structures_folder` is not a folder')
         else:
@@ -364,8 +370,12 @@ def _submit_ecint(resdir, webhook, workflow, workflow_inp):
     if workflow_inp.get('structure'):
         workflow_inp['structure'].store()
     elif workflow_inp.get('structures'):
-        for structure_data in workflow_inp['structures'].values():
-            structure_data.store()
+        if isinstance(workflow_inp['structures'], dict):
+            for structure_data in workflow_inp['structures'].values():
+                structure_data.store()
+        elif isinstance(workflow_inp['structures'], list):
+            for structure_data in workflow_inp['structures']:
+                structure_data.store()
     elif workflow_inp.get('imd'):
         for settings in workflow_inp['imd']:
             for structure in settings['structures']:

@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from warnings import warn
 
 import numpy as np
-from aiida.orm import SinglefileData, StructureData
+from aiida.orm import SinglefileData
 from aiida_cp2k.utils import Cp2kInput
 
 from ecint.preprocessor.kind import DZVPPBE, KindSection
@@ -12,7 +12,7 @@ from ecint.preprocessor.utils import load_config, update_dict
 from ecint.workflow.units import CONFIG_DIR
 
 __all__ = ['EnergyInputSets', 'GeooptInputSets', 'NebInputSets',
-           'FrequencyInputSets', 'DeepmdInputSets', 'LammpsInputSets']
+           'FrequencyInputSets', 'DPInputSets', 'QBCInputSets']
 
 
 def make_tag_config(init_config, typemap):
@@ -260,7 +260,7 @@ class FrequencyInputSets(UnitsInputSets):
                                     "PRINT_LEVEL": "MEDIUM"}})
 
 
-class DeepmdInputSets(object):
+class DPInputSets(object):
     """
     for deepmd
     """
@@ -301,10 +301,10 @@ class DeepmdInputSets(object):
 
 
 @dataclass
-class LammpsInputSets(object):
+class QBCInputSets(object):
     TypeMap = {'default': 'lmp_md.in'}
 
-    structure: StructureData
+    structures: list
     kinds: list
     init_template: str
     variables: dict
@@ -330,9 +330,9 @@ class LammpsInputSets(object):
                 files[f'graph_{i}'] = graph
         variables = self.variables
         variables.update({
-            '_GRAPHS': ' '.join([f'{g}.pb' for g in files.keys()]),
-            '_SEED': np.random.randint(10000000),
-            '_INPUT_STRUCTURE': 'input.data'
+            '_GRAPHS': [' '.join([f'../{g}.pb' for g in files.keys()])],
+            '_SEED': [np.random.randint(10000000)],
+            '_INPUT_STRUCTURE': ['input.data']
         })
         _input_sets = {
             'template': self.template,

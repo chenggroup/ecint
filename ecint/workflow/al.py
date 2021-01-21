@@ -1,8 +1,7 @@
-import json
+import os
 import os
 import random
 from collections import namedtuple
-from itertools import product
 from uuid import uuid4
 
 from aiida.engine import while_, WorkChain
@@ -11,11 +10,10 @@ from ase.io import read
 
 from ecint.config import RESULT_NAME
 from ecint.postprocessor.utils import write_datadir_from_energyworkchain
-from ecint.postprocessor.visualization import get_learning_curve, \
-    get_model_devi_distribution
+from ecint.postprocessor.visualization import get_learning_curve
 from ecint.preprocessor.utils import inspect_node
-from ecint.workflow.units.base import DeepmdSingleWorkChain, \
-    EnergySingleWorkChain, ModelDeviationSingleWorkChain
+from ecint.workflow.units.base import DPSingleWorkChain, \
+    EnergySingleWorkChain, QBCBatchWorkChain
 
 
 def download_file(node, remotename, localname):
@@ -43,13 +41,14 @@ class ActiveLearning(WorkChain):
     _ITER_NAME = 'iter_'
     _MODELS_DIR = 'models'
     _MD_DIR = 'md'
+    _SCREEN_DIR = 'screen'
     _FP_DIR = 'fp'
 
     @classmethod
     def define(cls, spec):
         super(ActiveLearning, cls).define(spec)
         # spec.inputs('structures', valid_type=StructureData)
-        spec.expose_inputs(DeepmdSingleWorkChain,
+        spec.expose_inputs(DPSingleWorkChain,
                            include=['datadirs', 'kinds', 'descriptor_sel'])
         # `structures` and many `variables` in imd
         # TODO: different structures with different variables in a same loop
@@ -58,10 +57,10 @@ class ActiveLearning(WorkChain):
         # TODO: need parameters like fp_task_max/min
         spec.input('labeling.task_max', valid_type=int, default=20, non_db=True)
         spec.input('labeling.task_min', valid_type=int, default=1, non_db=True)
-        spec.expose_inputs(DeepmdSingleWorkChain,
+        spec.expose_inputs(DPSingleWorkChain,
                            namespace='training',
                            include=['resdir', 'config', 'machine'])
-        spec.expose_inputs(ModelDeviationSingleWorkChain,
+        spec.expose_inputs(QBCBatchWorkChain,
                            namespace='exploration',
                            include=['resdir', 'template', 'machine',
                                     'model_devi'])
@@ -119,11 +118,11 @@ class ActiveLearning(WorkChain):
 
     def submit_training(self):
         for i in range(self.inputs.num_pb.value):
-            init_inputs = self.exposed_inputs(DeepmdSingleWorkChain)
+            init_inputs = self.exposed_inputs(DPSingleWorkChain)
             init_inputs['datadirs'] = self.ctx.datadirs
-            node = self.submit(DeepmdSingleWorkChain,
+            node = self.submit(DPSingleWorkChain,
                                **init_inputs,
-                               **self.exposed_inputs(DeepmdSingleWorkChain,
+                               **self.exposed_inputs(DPSingleWorkChain,
                                                      namespace='training',
                                                      agglomerate=False))
             self.to_context(**{f'dpmd_{i}': node})
@@ -172,74 +171,70 @@ class ActiveLearning(WorkChain):
 
     def submit_exploration(self):
         # nloop = 0  # should be changed when run workchain, now just test
-        settings = self.inputs.imd[self.ctx.loops]
-        # construct s_and_v for a dict like {'s': [], 'v': [], ...}
-        s_and_v = {}
+        md_dir = os.path.join(self.inputs.exploration.resdir,
+                              self._ITER_NAME + str(self.ctx.loops),
+                              self._MD_DIR)
+        os.makedirs(md_dir, exist_ok=True)
+        variables = self.inputs.imd[self.ctx.loops]
+        structures = variables.pop('structures')
+        node = self.submit(QBCBatchWorkChain,
+                           label=md_dir,
+                           structures=structures,
+                           variables=variables,
+                           kinds=self.inputs.kinds,
+                           graphs=[self.ctx[f'dpmd_{i}'].outputs.model
+                                   for i in range(self.inputs.num_pb.value)],
+                           **self.exposed_inputs(QBCBatchWorkChain,
+                                                 namespace='exploration',
+                                                 agglomerate=False))
+        self.to_context(qbc=node)
+        # # construct s_and_v for a dict like {'s': [], 'v': [], ...}
+        # s_and_v = {}
         # TODO: move it (isinstance) to check_imd
-        for k in settings.keys():
-            if isinstance(settings[k], list):
-                s_and_v.update({k: settings[k]})
-            else:
-                raise TypeError(f'`{k}` should be list')
-        # just split v, and keep s
-        self.ctx.s_list = s_and_v.pop('structures')
-        self.ctx.v_list = [dict(zip(s_and_v.keys(), v))
-                           for v in product(*s_and_v.values())]
-        # submit and get n * model_devi.out
-        self.ctx.md_dir = os.path.join(self.inputs.exploration.resdir,
-                                       self._ITER_NAME + str(self.ctx.loops),
-                                       self._MD_DIR)
-        for i_v, v in enumerate(self.ctx.v_list):
-            for i_s, s in enumerate(self.ctx.s_list):
-                sv = {'structure': s, 'variables': v}
-                condition_dir = os.path.join(self.ctx.md_dir,
-                                             f'condition_{i_v}')
-                os.makedirs(condition_dir, exist_ok=True)
-                node = self.submit(ModelDeviationSingleWorkChain,
-                                   label=os.path.join(condition_dir,
-                                                      f'model_devi_{i_s}'),
-                                   kinds=self.inputs.kinds,
-                                   graphs=[self.ctx[f'dpmd_{i}'].outputs.model
-                                           for i in
-                                           range(self.inputs.num_pb.value)],
-                                   **sv,
-                                   **self.exposed_inputs(
-                                       ModelDeviationSingleWorkChain,
-                                       namespace='exploration'))
-                self.to_context(**{f'model_devi_{i_v}_{i_s}': node})
+        # for k in settings.keys():
+        #     if isinstance(settings[k], list):
+        #         s_and_v.update({k: settings[k]})
+        #     else:
+        #         raise TypeError(f'`{k}` should be list')
+        # # just split v, and keep s
+        # self.ctx.s_list = s_and_v.pop('structures')
+        # self.ctx.v_list = [dict(zip(s_and_v.keys(), v))
+        #                    for v in product(*s_and_v.values())]
+        # # submit and get n * model_devi.out
+        # self.ctx.md_dir = os.path.join(self.inputs.exploration.resdir,
+        #                                self._ITER_NAME + str(self.ctx.loops),
+        #                                self._MD_DIR)
+        # for i_v, v in enumerate(self.ctx.v_list):
+        #     for i_s, s in enumerate(self.ctx.s_list):
+        #         sv = {'structure': s, 'variables': v}
+        #         condition_dir = os.path.join(self.ctx.md_dir,
+        #                                      f'condition_{i_v}')
+        #         os.makedirs(condition_dir, exist_ok=True)
+        #         node = self.submit(QBCBatchWorkChain,
+        #                            label=os.path.join(condition_dir,
+        #                                               f'model_devi_{i_s}'),
+        #                            kinds=self.inputs.kinds,
+        #                            graphs=[self.ctx[f'dpmd_{i}'].outputs.model
+        #                                    for i in
+        #                                    range(self.inputs.num_pb.value)],
+        #                            **sv,
+        #                            **self.exposed_inputs(
+        #                                QBCBatchWorkChain,
+        #                                namespace='exploration'))
+        #         self.to_context(**{f'model_devi_{i_v}_{i_s}': node})
 
     def inspect_exploration(self):
-        for i_v in range(len(self.ctx.v_list)):
-            for i_s in range(len(self.ctx.s_list)):
-                inspect_node(self.ctx[f'model_devi_{i_v}_{i_s}'])
+        inspect_node(self.ctx.qbc)
 
     # TODO: one ssh connect to download all lmp structures
     def get_candidate(self):
-        for i_v, condition in enumerate(self.ctx.v_list):
-            condition_dir = os.path.join(self.ctx.md_dir, f'condition_{i_v}')
-            # condition.json
-            with open(os.path.join(condition_dir, 'condition.json'), 'w') as f:
-                json.dump(condition, f, sort_keys=True, indent=2)
-            # distribution.jpg
-            model_devi_list = [os.path.join(condition_dir,
-                                            f'model_devi_{i_s}.out')
-                               for i_s in range(len(self.ctx.s_list))]
-            fl = self.inputs.exploration.model_devi.force_low_limit
-            fh = self.inputs.exploration.model_devi.force_high_limit
-            skip = self.inputs.exploration.model_devi.skip_images
-            get_model_devi_distribution(
-                model_devi_list, fl, fh, skip,
-                'Distribution of force deviation',
-                os.path.join(condition_dir, 'force_devi_distribution.jpg'))
-
         # select candidate
-        p = namedtuple('Point', ['i_v', 'i_s', 'step'])
+        p = namedtuple('Point', ['i_traj', 'step'])
         all_candidate, selected_candidate = [], None
-        for i_v in range(len(self.ctx.v_list)):
-            for i_s in range(len(self.ctx.s_list)):
-                node = self.ctx[f'model_devi_{i_v}_{i_s}']
-                for step in node.outputs.candidate:
-                    all_candidate.append(p(i_v, i_s, step))
+        for i_traj, traj in enumerate([md_index['candidate'] for md_index in
+                                       self.ctx.qbc.outputs.model_devi_index]):
+            for step in traj:
+                all_candidate.append(p(i_traj, step))
         if len(all_candidate) > self.inputs.labeling.task_max:
             selected_candidate = random.sample(all_candidate,
                                                k=self.inputs.labeling.task_max)
@@ -250,35 +245,87 @@ class ActiveLearning(WorkChain):
             # TODO: break big loop
             self.report('No enough candidates')  # set flag to break whole loops
         # download *.lammpstrj
-        self.ctx.structures = []
+        self.ctx.fp_dir = os.path.join(self.inputs.labeling.resdir,
+                                       self._ITER_NAME + str(self.ctx.loops),
+                                       self._FP_DIR)
+        self.ctx.fp_stc = []
         if selected_candidate:
             for candidate in selected_candidate:
-                i_v, i_s, step = candidate
-                node = self.ctx[f'model_devi_{i_v}_{i_s}']
-                filename = f'{step}.lammpstrj'
-                file_download = os.path.join(self.ctx.md_dir,
-                                             f'condition_{i_v}',
-                                             f'traj_{i_s}',
-                                             filename)
-                download_file(node, filename, file_download)
-                atoms = read(file_download, format='lammps-dump-text',
+                remote_folder = self.ctx.qbc.outputs.remote_folder
+                subfolder = str(candidate.i_traj)
+                filename = str(candidate.step) + '.lammpstrj'
+                localfolder = os.path.join(self.ctx.fp_dir, 'candidate',
+                                           subfolder)
+                localfile = os.path.join(localfolder, filename)
+                os.makedirs(localfolder, exist_ok=True)
+                remote_folder.getfile(os.path.join(subfolder, filename),
+                                      localfile)
+                atoms = read(localfile, format='lammps-dump-text',
                              specorder=self.inputs.kinds)
-                self.ctx.structures.append(StructureData(ase=atoms))
+                self.ctx.fp_stc.append(StructureData(ase=atoms))
+
+        # for i_v, condition in enumerate(self.ctx.v_list):
+        #     condition_dir = os.path.join(self.ctx.md_dir, f'condition_{i_v}')
+        #     # condition.json
+        #     with open(os.path.join(condition_dir, 'condition.json'), 'w') as f:
+        #         json.dump(condition, f, sort_keys=True, indent=2)
+        #     # distribution.jpg
+        #     model_devi_list = [os.path.join(condition_dir,
+        #                                     f'model_devi_{i_s}.out')
+        #                        for i_s in range(len(self.ctx.s_list))]
+        #     fl = self.inputs.exploration.model_devi.force_low_limit
+        #     fh = self.inputs.exploration.model_devi.force_high_limit
+        #     skip = self.inputs.exploration.model_devi.skip_images
+        #     get_model_devi_distribution(
+        #         model_devi_list, fl, fh, skip,
+        #         'Distribution of force deviation',
+        #         os.path.join(condition_dir, 'force_devi_distribution.jpg'))
+        #
+        # # select candidate
+        # p = namedtuple('Point', ['i_v', 'i_s', 'step'])
+        # all_candidate, selected_candidate = [], None
+        # for i_v in range(len(self.ctx.v_list)):
+        #     for i_s in range(len(self.ctx.s_list)):
+        #         node = self.ctx[f'model_devi_{i_v}_{i_s}']
+        #         for step in node.outputs.candidate:
+        #             all_candidate.append(p(i_v, i_s, step))
+        # if len(all_candidate) > self.inputs.labeling.task_max:
+        #     selected_candidate = random.sample(all_candidate,
+        #                                        k=self.inputs.labeling.task_max)
+        # elif ((len(all_candidate) >= self.inputs.labeling.task_min) and
+        #       (len(all_candidate) <= self.inputs.labeling.task_max)):
+        #     selected_candidate = all_candidate
+        # elif len(all_candidate) < self.inputs.labeling.task_min:
+        #     # TODO: break big loop
+        #     self.report('No enough candidates')  # set flag to break whole loops
+        # # download *.lammpstrj
+        # self.ctx.structures = []
+        # if selected_candidate:
+        #     for candidate in selected_candidate:
+        #         i_v, i_s, step = candidate
+        #         node = self.ctx[f'model_devi_{i_v}_{i_s}']
+        #         filename = f'{step}.lammpstrj'
+        #         file_download = os.path.join(self.ctx.md_dir,
+        #                                      f'condition_{i_v}',
+        #                                      f'traj_{i_s}',
+        #                                      filename)
+        #         download_file(node, filename, file_download)
+        #         atoms = read(file_download, format='lammps-dump-text',
+        #                      specorder=self.inputs.kinds)
+        #         self.ctx.structures.append(StructureData(ase=atoms))
 
     def submit_labeling(self):
-        fp_dir = os.path.join(self.inputs.labeling.resdir,
-                              self._ITER_NAME + str(self.ctx.loops),
-                              self._FP_DIR)
-        for i, structure in enumerate(self.ctx.structures):
+        for i, structure in enumerate(self.ctx.fp_stc):
             node = self.submit(EnergySingleWorkChain,
-                               label=os.path.join(fp_dir, f'coords_{i}'),
+                               label=os.path.join(self.ctx.fp_dir,
+                                                  f'coords_{i}'),
                                structure=structure,
                                **self.exposed_inputs(EnergySingleWorkChain,
                                                      namespace='labeling'))
             self.to_context(**{f'fp_{i}': node})
 
     def inspect_labeling(self):
-        for i in range(len(self.ctx.structures)):
+        for i in range(len(self.ctx.fp_stc)):
             inspect_node(self.ctx[f'fp_{i}'])
 
     def get_datadir(self):
@@ -288,7 +335,7 @@ class ActiveLearning(WorkChain):
                                        self._MODELS_DIR)
         datadirs_name = os.path.join(next_models_dir, 'datadirs')
         os.makedirs(datadirs_name, exist_ok=True)
-        nodes = [self.ctx[f'fp_{i}'] for i in range(len(self.ctx.structures))]
+        nodes = [self.ctx[f'fp_{i}'] for i in range(len(self.ctx.fp_stc))]
         nodes_categories = {}
         for node in nodes:
             structure = node.inputs.structure

@@ -3,14 +3,14 @@ from abc import ABCMeta, abstractmethod
 from aiida.orm import Code, Dict, StructureData
 from aiida_cp2k.workchains import Cp2kBaseWorkChain
 from aiida_deepmd.calculations.dp import DpCalculation
-from aiida_lammps.calculations.lammps.template import TemplateWorkChain
+from aiida_lammps.calculations.lammps.template import BatchTemplateCalculation
 from ase import Atoms
 
 from ecint.preprocessor.utils import get_procs_per_node_from_code_name, \
     load_machine, uniform_neb
 
 __all__ = ['EnergyPreprocessor', 'GeooptPreprocessor', 'NebPreprocessor',
-           'FrequencyPreprocessor', 'DeepmdPreprocessor', 'LammpsPreprocessor']
+           'FrequencyPreprocessor', 'DPPreprocessor', 'QBCPreprocessor']
 
 
 def set_machine(builder, restrict_machine, isslurm=False):
@@ -96,9 +96,9 @@ class Cp2kPreprocessor(Preprocessor):
         return _builder
 
 
-class DeepmdPreprocessor(Preprocessor):
+class DPPreprocessor(Preprocessor):
     def __init__(self, inpclass, restrict_machine=None):
-        super(DeepmdPreprocessor, self).__init__(inpclass, restrict_machine)
+        super(DPPreprocessor, self).__init__(inpclass, restrict_machine)
         self.datadirs = inpclass.datadirs
         self.kinds = inpclass.kinds
         self.descriptor_sel = inpclass.descriptor_sel
@@ -120,22 +120,22 @@ class DeepmdPreprocessor(Preprocessor):
         return _builder
 
 
-class LammpsPreprocessor(Preprocessor):
+class QBCPreprocessor(Preprocessor):
     def __init__(self, inpclass, restrict_machine=None):
-        super(LammpsPreprocessor, self).__init__(inpclass, restrict_machine)
-        self.structure = inpclass.structure
+        super(QBCPreprocessor, self).__init__(inpclass, restrict_machine)
+        self.structures = inpclass.structures
         self.kinds = inpclass.kinds
 
     @property
     def builder(self):
-        _builder = TemplateWorkChain.get_builder()
-        _builder.structure = self.structure
+        _builder = BatchTemplateCalculation.get_builder()
+        _builder.structures = self.structures
         _builder.kinds = self.kinds
         _builder.template = self.parameters['template']
         _builder.variables = self.parameters['variables']
         _builder.file = self.parameters['file']
         _builder.settings = Dict(
-            dict={'additional_retrieve_list': ['model_devi.out']})
+            dict={'additional_retrieve_list': ['*/model_devi.out']})
 
         set_machine(_builder, self.machine, isslurm=True)
         return _builder
