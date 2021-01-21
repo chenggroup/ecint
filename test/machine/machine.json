@@ -1,0 +1,6 @@
+{
+  "DUMP_FREQ": 10,
+  "NSTEPS": 1000,
+  "TEMP": 330,
+  "THERMO_FREQ": 10
+}

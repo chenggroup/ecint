@@ -1,0 +1,38 @@
+variable        NSTEPS          equal 2000000
+variable        THERMO_FREQ     equal 10
+variable        DUMP_FREQ       equal 10
+variable        TEMP            equal 323
+variable        PRES            equal -1.000000
+variable        TIMESTEP        equal 0.000500
+variable        TAU_T           equal v_TIMESTEP*100
+variable        TAU_P           equal 0.500000
+
+#################### Setup ########################
+units           metal
+boundary        p p p
+atom_style      atomic
+atom_modify     map yes
+
+neighbor        1.0 bin
+neigh_modify    delay 10 every 1
+read_data       conf.lmp
+
+mass            1 197.000000
+mass            2  16.000000
+
+pair_style      deepmd ../graph.000.pb ../graph.001.pb ../graph.002.pb ../graph.003.pb out_freq 10 out_file model_devi.out
+pair_coeff
+
+#################### Print #########################
+thermo_style    custom step temp pe ke etotal press vol lx ly lz xy xz yz
+thermo          ${THERMO_FREQ}
+
+dump            dpgen_dump all custom 10 dump.lammpstrj id type x y z
+
+#################### Sampling ###################$$
+velocity        all create ${TEMP} 551656
+
+fix             1 all nvt temp ${TEMP} ${TEMP} ${TAU_T}
+
+timestep        ${TIMESTEP}
+run             ${NSTEPS}

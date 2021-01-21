@@ -1,0 +1,33 @@
+workflow: ActiveLearning
+webhook: https://oapi.dingtalk.com/robot/send?access_token=a3cd7e35c31f149248a46053f51b11ad843cc50a975730e565cb3f0292f8e56b
+resdir: results_yaml
+datadirs:
+  - dpinit
+imd:
+  - structures_folder: md_init
+    NSTEPS: [ 1000 ]
+    THERMO_FREQ: [ 10 ]
+    DUMP_FREQ: [ 10 ]
+    TEMP: [ 330, 430 ]
+  - structures_folder: md_init
+    NSTEPS: [ 1000 ]
+    THERMO_FREQ: [ 10 ]
+    DUMP_FREQ: [ 10 ]
+    TEMP: [ 330, 430 ]
+kinds:
+  - H
+  - O
+  - Sn
+descriptor_sel:
+  - 190
+  - 190
+  - 80
+subdata:
+  training:
+    config: sno2-train-input.json
+  exploration:
+    model_devi:
+      force_low_limit: 3
+      force_high_limit: 10
+  labeling:
+    task_max: 8

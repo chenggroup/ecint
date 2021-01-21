@@ -1,0 +1,18 @@
+{
+  "workflow": "ActiveLearning",
+  "webhook": "https://oapi.dingtalk.com/robot/send?access_token=ae57347179e92536615334acaebba715c1b8196d01c1d306b74e3134a6fb2d2c",
+  "resdir": "results_json_1",
+  "datadirs": [
+      "dpinit/Cu13C1O1"
+  ],
+  "imd": [
+    { "structures_folder": "md_init/000", "NSTEPS": [ 100 ], "THERMO_FREQ": [ 2 ], "DUMP_FREQ": [ 2 ], "TEMP": [ 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 ] },
+    { "structures_folder": "md_init/001", "NSTEPS": [ 1000 ], "THERMO_FREQ": [ 10 ], "DUMP_FREQ": [ 10 ], "TEMP": [ 100, 200, 300, 400, 500, 600, 700, 800, 900, 1000 ] } ],
+  "kinds": [ "Cu", "C", "O" ],
+  "descriptor_sel": [ 13, 1, 1 ],
+  "subdata": {
+    "training": { "config": "cuco-train-input.json" },
+    "exploration": { "model_devi": { "force_low_limit": 0.06, "force_high_limit": 0.18 } },
+    "labeling": { "task_max": 200 }
+  }
+}

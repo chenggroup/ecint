@@ -1,0 +1,12 @@
+workflow: DeepmdSingleWorkChain
+webhook: https://oapi.dingtalk.com/robot/send?access_token=xxx
+resdir: results_yaml
+datadirs:
+  - dpinit
+metadata:
+  kinds:
+    - O
+    - H
+  descriptor_sel:
+    - 50
+    - 100
