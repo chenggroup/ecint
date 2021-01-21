@@ -56,7 +56,6 @@ def get_provenance_graph(pk, level='minimal',
                              baseworkchain_list]]
         code_pk = load_node(
             calculation_list[0]).get_incoming().get_node_by_label('code')
-
         graph.add_incoming(pk, annotate_links=annotate_links)
         graph.add_outgoing(pk, annotate_links=annotate_links)
         for node_pk in singleworkchain_list:
@@ -107,22 +106,22 @@ def get_model_devi_distribution(model_devi_list, force_low_limit,
                                 title='Distribution of force deviation',
                                 filename='force_devi_distribution.jpg'):
     force = []
-    plt.figure()
+    fig, ax = plt.subplots()
     for model_devi_name in model_devi_list:
         model_devi = np.loadtxt(model_devi_name)
         force.extend(model_devi[model_devi[:, 0] >= skip_images][:, 4])
     hb = plt.hist(force, bins=len(force),
                   weights=np.ones_like(force) / len(force))
     xmax, ymax = 5, max(hb[0]) * 1.1
-    plt.xlim(0, xmax)
-    plt.ylim(0, ymax)
-    plt.vlines(force_low_limit, 0, ymax, linestyles='dashed')
-    plt.vlines(force_high_limit, 0, ymax, linestyles='dashed')
-    plt.xlabel('$\sigma_{f}^{max}$ (eV/Å)')
-    plt.ylabel('Distribution')
-    plt.title(title)
-    plt.tight_layout()
-    plt.savefig(filename)
+    ax.set_xlim(0, xmax)
+    ax.set_ylim(0, ymax)
+    ax.vlines(force_low_limit, 0, ymax, linestyles='dashed')
+    ax.vlines(force_high_limit, 0, ymax, linestyles='dashed')
+    ax.set_xlabel('$\sigma_{f}^{max}$ (eV/Å)')
+    ax.set_ylabel('Distribution')
+    ax.set_title(title)
+    fig.tight_layout()
+    fig.savefig(filename)
     return hb[:-1]
 
 
