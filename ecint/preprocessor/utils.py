@@ -226,7 +226,7 @@ def update_dict(nested_dict, item):
             nested_dict[k] = update_dict(nested_dict.get(k, {}), v)
         else:
             nested_dict[k] = v
-        return nested_dict
+    return nested_dict
 
 
 def get_procs_per_node(computer):
